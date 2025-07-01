@@ -1,0 +1,171 @@
+#!/bin/bash
+VERSION="1.0.0"
+
+#0################### IN1CLICK for Concurrency Count #####################
+#
+# DISCLAIMER:
+# This bash script was first published for PBXact and FreePBX on 1st July
+# 2025. Contents are provided as-is without warranty of any kind, express
+# or implied. You may modify, distribute, and use this script; 20tele.com
+# accepts no responsibility for any damage or issues arising from its use.
+#
+# PURPOSE:
+# IN1CLICK is a streamline, automated installer script created to quickly
+# and reliably install and launch custom scripts developed by 20tele.com.
+# The installer automates the setup for use without manual configuration.
+#
+# ${RED}WARNING:${NC}
+# Please test it thoroughly in a controlled environment before deploying.
+#
+# VERSION:
+# ${VERSION}
+#
+# PUBLISHED:
+# 1st July 2025
+#
+# LICENSE:
+# GNU General Public License v3.0
+#
+#1#######################################################################
+
+set -e
+
+LBLUE='\033[1;94m'
+NC='\033[0m'
+
+created_mycfn=0
+
+cleanup() {
+  echo "An error occurred during installation."
+  if [ "$created_mycfn" -eq 1 ]; then
+    echo "Removing created /root/.my.cnf"
+    rm -f /root/.my.cnf
+  fi
+  echo "Please install manually or contact support at support@20tele.com."
+  exit 1
+}
+
+trap 'cleanup' ERR
+
+echo -e "${LBLUE}Hello. Thanks for using IN1CLICK by 20tele.com${NC}"
+echo
+sleep 1
+
+echo "Checking Asterisk version..."
+astver_full=$(asterisk -V 2>/dev/null || echo "unknown")
+echo "Full Asterisk version string: $astver_full"
+sleep 1
+
+# Extract first number found (major version)
+astver_major=$(echo "$astver_full" | grep -oP '\d+' | head -1)
+
+echo "Extracted major version: '$astver_major'"
+sleep 1
+
+if [[ "$astver_major" =~ ^(18|20|22)$ ]]; then
+  echo "Asterisk version supported."
+else
+  echo "WARNING: Asterisk version $astver_full is not supported. Supported versions: 18, 20, 22."
+  read -rp "Proceed anyway? (y/N): " proceed
+  proceed=${proceed,,}
+  if [[ "$proceed" != "y" ]]; then
+  echo
+    echo "Installation aborted due to unsupported Asterisk version."
+    echo
+    trap - ERR
+    exit 1
+  fi
+fi
+
+sleep 1
+echo
+echo "Checking if Concurrency Count is already installed..."
+sleep 1
+if [ -f /usr/local/bin/concurrency-count ]; then
+  echo "Concurrency Count is already installed."
+  read -rp "Overwrite with the latest version? (y/N): " confirm
+  confirm=${confirm,,}
+  if [[ "$confirm" != "y" ]]; then
+  echo
+    echo "Installation aborted by user."
+    echo
+    trap - ERR
+    exit 0
+  fi
+else
+  echo "Concurrency Count is not installed. Proceeding with installation..."
+fi
+sleep 1
+
+echo
+echo "Checking for PHP..."
+sleep 1
+if ! command -v php &> /dev/null; then
+  echo "PHP is not installed or not found in PATH."
+  trap - ERR
+  exit 1
+fi
+echo "PHP found."
+sleep 1
+
+echo
+echo "Checking for existing /root/.my.cnf..."
+sleep 1
+if [ -f /root/.my.cnf ]; then
+  echo "/root/.my.cnf exists, skipping creation."
+else
+  echo "Creating /root/.my.cnf from FreePBX config (without database line)..."
+  php -r 'include "/etc/freepbx.conf"; echo "[client]\nuser=" . $amp_conf["AMPDBUSER"] . "\npassword=" . $amp_conf["AMPDBPASS"] . "\nhost=" . $amp_conf["AMPDBHOST"] . "\n";' > /root/.my.cnf
+  chmod 600 /root/.my.cnf
+  created_mycfn=1
+  echo "/root/.my.cnf created and secured."
+fi
+sleep 1
+
+echo
+echo "Checking for wget..."
+sleep 1
+if ! command -v wget &> /dev/null; then
+  echo "wget not found. Installing..."
+  if command -v yum &> /dev/null; then
+    yum install -y wget
+  elif command -v apt &> /dev/null; then
+    apt update && apt install -y wget
+  else
+    echo "No supported package manager found."
+    trap - ERR
+    exit 1
+  fi
+  echo "wget installed."
+else
+  echo "wget is already installed."
+fi
+sleep 1
+
+echo
+echo "Downloading concurrency-count script..."
+wget -O /usr/local/bin/concurrency-count https://raw.githubusercontent.com/20telecom/concurrency-count/main/concurrency-count
+if [ ! -s /usr/local/bin/concurrency-count ]; then
+  echo "Download failed or file is empty."
+  trap - ERR
+  exit 1
+fi
+
+echo "Installation complete. Please wait..."
+sleep 3
+
+echo
+echo "Setting execute permissions on concurrency-count script..."
+chmod 755 /usr/local/bin/concurrency-count
+sleep 1
+
+echo
+echo "Removing IN1CLICK by 20tele.com..."
+rm -- "$0"
+
+echo
+echo "Launching Concurrency Count..."
+trap - ERR
+/usr/local/bin/concurrency-count
+
+exit 0
