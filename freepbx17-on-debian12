@@ -1,0 +1,481 @@
+#!/bin/bash
+VERSION="1.0.0"
+
+#0################# IN1CLICK for FreePBX on Debian 12 ###################
+#
+# DISCLAIMER:
+# The bash script was first published to install FreePBX 17 on 5th August
+# 2025. Contents are provided as-is without warranty of any kind, express
+# or implied. You may modify, distribute, and use this script; 20tele.com
+# accepts no responsibility for any damage or issues arising from its use.
+#
+# PURPOSE:
+# IN1CLICK is a streamline, automated installer script created to quickly
+# and reliably install and launch custom scripts developed by 20tele.com.
+# The installer automates the setup for use without manual configuration.
+#
+# ${BRED}WARNING:${NC}
+# Please test it thoroughly in a controlled environment before deploying.
+#
+# VERSION:
+# ${VERSION}
+#
+# PUBLISHED:
+# 5th July 2025
+#
+# LICENSE:
+# GNU General Public License v3.0
+#
+#1#######################################################################
+
+# Exit on error, undefined variables, or pipeline failures
+set -euo pipefail
+
+# Record the start time to calculate total runtime later
+START_TIME=$(date +%s)
+
+# Colours
+BGRN='\033[1;32m'
+BRED='\033[1;31m'
+LBLUE='\033[1;94m'
+BYEL='\e[93m'
+WHT='\033[1;37m'
+NC='\033[0m'
+
+# Sleep Delay for user readability
+SLEEP_DELAY=0.5
+
+# Function to print section headers
+print_step() {
+  echo -e "\n${BGRN}$1${NC}\n"
+}
+
+# If FreePBX Installation Fails
+handle_install_failure() {
+  echo -e "${BRED}WARNING: The official FreePBX 17 installation script failed. ${WHT}This isn't an IN1CLICK error.${NC}"
+  echo -e "${WHT}Everything was going OK, until we ran into a problem installing FreePBX 17 or Asterisk 22.${NC}"
+  echo -e "${WHT}What might have happened:${NC}"
+  echo -e "  ${BYEL}- A package failed to install (e.g. a missing dependency or outdated repository).${NC}"
+  echo -e "  ${BYEL}- Asterisk did not start properly due to broken modules or invalid configuration.${NC}"
+  echo -e "  ${BYEL}- If the GUI is broken, Apache may have failed or PHP configuration is incorrect.${NC}"
+  echo -e "${BRED}WARNING: The script exited unexpectedly before completing the installation. ${WHT}What you can do now:${NC}"
+  echo -e "  ${BYEL}- Check the FreePBX install logs:${NC}"
+  echo -e "      ${WHT}cat /var/log/pbx/freepbx-*.log${NC}"
+  echo -e "  ${BYEL}- Check if Asterisk is running:${NC}"
+  echo -e "      ${WHT}systemctl status asterisk${NC}"
+  echo -e "  ${BYEL}- Check for install-time errors:${NC}"
+  echo -e "      ${WHT}tail -n 100 /var/log/asterisk/full${NC}"
+  echo -e "  ${BYEL}- Try restarting the FreePBX framework:${NC}"
+  echo -e "      ${WHT}fwconsole restart${NC}"
+  echo -e "  ${BYEL}- Use WinSCP (Windows): File protocol: SCP, Host name: enter your IP address, Port: 22, login, go to:${NC}"
+  echo -e "      ${WHT}/var/log/pbx/freepbx-*.log${NC}"
+  echo -e "  ${BYEL}If you need help, email the log to support@20tele.com or open a ticket at https://support.20tele.com${NC}"
+  echo -e "${BRED}IN1CLICK is now exiting due to a failed FreePBX install. ${LBLUE}Goodbye.${NC}"
+  exit 1
+}
+sleep 4
+
+# Welcome
+echo
+echo -e "${LBLUE}Hello. Thanks for using IN1CLICK for FreePBX 17 on Debian 12 [$VERSION] by 20tele.com${NC}"
+sleep $SLEEP_DELAY
+
+# Operating System check
+print_step "Checking if this is Debian 12..."
+if grep -q 'Debian GNU/Linux 12' /etc/os-release; then
+  echo -e "Debian 12 confirmed. ${WHT}OK to proceed.${NC}"
+  sleep $SLEEP_DELAY
+else
+  echo -e "${BRED}This script is only supported on Debian 12. Exiting, IN1CLICK is not appropriate for this installation.${NC}"
+  exit 1
+fi
+
+# Disk space check
+print_step "Checking available disk space..."
+REQUIRED_KB=10485760  # 10 GB
+AVAILABLE_KB=$(df / | tail -1 | awk '{print $4}')
+if (( AVAILABLE_KB < REQUIRED_KB )); then
+  echo -e "${BRED}Insufficient disk space on root (/). At least 10 GB is required.${NC}"
+  echo -e "Only $(awk "BEGIN {printf \"%.2f\", $AVAILABLE_KB/1024/1024}") GB available."
+  exit 1
+else
+  echo -e "Disk space available: $(awk "BEGIN {printf \"%.2f\", $AVAILABLE_KB/1024/1024}") GB. ${WHT}OK to proceed.${NC}"
+fi
+sleep $SLEEP_DELAY
+
+# ─── Memory and Swap Check ───
+print_step "Checking available memory and swap..."
+TOTAL_MEM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+TOTAL_SWAP_KB=$(grep SwapTotal /proc/meminfo | awk '{print $2}')
+TOTAL_MEM_MB=$(( TOTAL_MEM_KB / 1024 ))
+TOTAL_SWAP_MB=$(( TOTAL_SWAP_KB / 1024 ))
+if (( TOTAL_MEM_MB < 1000 )) && (( TOTAL_SWAP_MB < 100 )); then
+  echo -e "${BRED}WARNING: Less than 1 GB RAM and no swap configured.${NC}"
+  echo -e "This may cause MariaDB, Apache, or Asterisk to crash during install or runtime."
+  echo -e "Consider adding swap with: ${WHT}fallocate -l 1G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile${NC}"
+else
+  echo -e "Memory: ${TOTAL_MEM_MB} MB, Swap: ${TOTAL_SWAP_MB} MB. ${WHT}OK to proceed.${NC}"
+fi
+sleep $SLEEP_DELAY
+
+# Architecture Check
+print_step "Checking system architecture..."
+ARCH=$(uname -m)
+if [[ "$ARCH" != "x86_64" ]]; then
+  echo -e "${BRED}Unsupported architecture: $ARCH. Debian 12 must be 64-bit (x86_64).${NC}"
+  exit 1
+else
+  echo -e "Architecture is 64-bit. ${WHT}OK to proceed.${NC}"
+fi
+sleep $SLEEP_DELAY
+
+# Hostname Label Check
+print_step "Checking hostname label format..."
+HOST=$(hostname)
+HOSTNAME_LABEL="${HOST%%.*}"
+if [[ ! "$HOST" =~ ^[a-z0-9.-]+$ ]]; then
+  echo -e "${BRED}Invalid hostname format. Use lowercase letters, numbers, and dashes only. Exiting.${NC}"
+  exit 1
+fi
+if [[ "$HOSTNAME_LABEL" =~ ^[0-9]+$ ]]; then
+  echo -e "${BRED}Invalid hostname label: must not be entirely numeric. Exiting.${NC}"
+  exit 1
+fi
+echo -e "Hostname label appears valid. ${WHT}OK to proceed.${NC}"
+sleep $SLEEP_DELAY
+
+# Desktop detection
+print_step "Checking for desktop environment..."
+if [[ -n "${XDG_CURRENT_DESKTOP:-}" || -d /usr/share/xsessions ]]; then
+  echo -e "${BRED}Desktop environment detected. Exiting, Debian should be minimal for FreePBX.${NC}"
+  exit 1
+else
+  echo -e "No desktop environment detected. ${WHT}OK to proceed.${NC}"
+  sleep $SLEEP_DELAY
+fi
+
+# /tmp mount check
+print_step "Checking /tmp permissions..."
+if mount | grep -q '/tmp' | grep -q noexec; then
+  echo -e "${BRED}/tmp is mounted with noexec. This will break FreePBX install. Exiting, please remount or fix fstab.${NC}"
+  exit 1
+else
+  echo -e "/tmp is writable and executable. ${WHT}OK to proceed.${NC}"
+  sleep $SLEEP_DELAY
+fi
+
+# Prevent FreePBX Overwrite
+print_step "Checking for existing FreePBX installation..."
+if [[ -f /etc/freepbx.conf || -d /var/www/html/admin ]]; then
+  echo -e "${BRED}FreePBX appears to be installed already. Exiting, IN1CLICK is not appropriate for this installation.${NC}"
+  echo
+  exit 1
+else
+  echo -e "No existing FreePBX found. ${WHT}OK to proceed.${NC}"
+  sleep $SLEEP_DELAY
+fi
+
+# Prevent Asterisk Overwrite
+print_step "Checking for existing Asterisk installation..."
+if command -v asterisk >/dev/null 2>&1 || systemctl list-units --type=service | grep -q 'asterisk'; then
+  echo -e "${BRED}Asterisk appears to be installed already. Exiting, IN1CLICK is not appropriate for this installation.${NC}"
+  echo
+  exit 1
+else
+  echo -e "No existing Asterisk found. ${WHT}OK to proceed.${NC}"
+  sleep $SLEEP_DELAY
+fi
+
+# Prevent MariaDB Overwrite
+print_step "Checking for existing MariaDB installation..."
+if systemctl list-units --type=service | grep -q 'mariadb' || command -v mariadbd >/dev/null 2>&1; then
+  echo -e "${BRED}MariaDB appears to be installed already. Exiting, IN1CLICK is not appropriate for this installation.${NC}"
+  echo
+  exit 1
+else
+  echo -e "No existing MariaDB found. ${WHT}OK to proceed.${NC}"
+  sleep $SLEEP_DELAY
+fi
+
+# Node.js presence check
+print_step "Checking for existing Node.js installation..."
+if command -v node >/dev/null 2>&1; then
+  NODE_VERSION=$(node -v)
+  echo -e "${BRED}WARNING: Node.js is already installed (${NODE_VERSION}). ${BYEL}Continuing anyway...${NC}"
+  IP_TYPE="Node.js already present"
+else
+  echo -e "No existing Node.js installation found. ${WHT}OK to proceed.${NC}"
+fi
+sleep $SLEEP_DELAY
+
+# APT source check
+print_step "Checking APT sources and update availability..."
+if ! grep -qE 'deb(\.|-security\.)debian\.org' /etc/apt/sources.list && ! grep -qrE 'debian\.org' /etc/apt/sources.list.d; then
+  echo -e "${BRED}Warning:${NC} APT sources do not appear to point to official Debian mirrors (e.g. deb.debian.org). Errors could occur due to outdated or unsupported packages. ${BYEL}Continuing anyway...${NC}"
+else
+  echo -e "APT sources appear to be valid. ${WHT}OK to proceed.${NC}"
+fi
+sleep $SLEEP_DELAY
+
+# System Preparation
+print_step "Updating package lists..."
+apt update -qq > /dev/null 2>&1
+echo -e "All package lists updated. ${WHT}OK to proceed.${NC}"
+sleep $SLEEP_DELAY
+print_step "Upgrading packages... Please be patient."
+UPGRADE_OUTPUT=$(DEBIAN_FRONTEND=noninteractive apt -y \
+  -o Dpkg::Options::="--force-confdef" \
+  -o Dpkg::Options::="--force-confold" upgrade 2>/dev/null)
+if echo "$UPGRADE_OUTPUT" | grep -q '0 upgraded'; then
+  echo -e "All packages are already up to date. ${WHT}OK to proceed.${NC}"
+else
+  echo -e "Packages upgraded successfully. ${WHT}OK to proceed.${NC}"
+fi
+sleep $SLEEP_DELAY
+
+# IPv4 interface and assignment type check
+print_step "Checking IP assignment type..."
+IFACE=$(ip -o -4 addr show | awk '{print $2}' | head -n1)
+if [[ -z "$IFACE" ]]; then
+  echo -e "${BRED}No active network interface with an IPv4 address was found. ${WHT}IN1CLICK cannot continue.${NC}"
+  echo
+  echo -e "${LBLUE}Goodbye.${NC}"
+  echo
+  exit 1
+fi
+IP_INFO=$(ip -o -4 addr show "$IFACE")
+if echo "$IP_INFO" | grep -q 'dynamic'; then
+  echo -e "${BRED}WARNING: IP appears to be dynamically assigned (DHCP).${BYEL} Continuing anyway...${NC}"
+  IP_TYPE="DHCP"
+elif echo "$IP_INFO" | grep -q 'inet'; then
+  echo -e "Static IP detected. ${WHT}OK to proceed.${NC}"
+  IP_TYPE="Static (assumed)"
+else
+  echo -e "${BRED}WARNING: Unable to determine IP assignment type. ${BYEL}Continuing anyway...${NC}"
+  IP_TYPE="Unknown"
+fi
+sleep $SLEEP_DELAY
+
+# iptables installation check
+print_step "Checking for iptables..."
+if ! command -v iptables >/dev/null 2>&1; then
+  echo -e "${BRED}WARNING: iptables not found. ${BYEL}Installing now...${NC}"
+  echo
+  apt install -y iptables
+  echo
+  echo -e "iptables installed successfully. ${WHT}OK to proceed.${NC}"
+else
+  echo -e "iptables is already installed. ${WHT}OK to proceed.${NC}"
+fi
+sleep $SLEEP_DELAY
+
+# iptables rules check
+print_step "Checking for active iptables rules..."
+if ! command -v iptables >/dev/null 2>&1; then
+  echo -e "${BRED}WARNING: iptables not found. ${BYEL}Continuing anyway...${NC}"
+else
+  if iptables -L -n | grep -q 'DROP\|REJECT'; then
+    echo -e "${BRED}Warning: iptables rules detected that may block web or SIP access. ${BYEL}Continuing anyway...${NC}"
+  else
+    echo -e "No active DROP/REJECT iptables rules detected. ${WHT}OK to proceed.${NC}"
+  fi
+fi
+sleep $SLEEP_DELAY
+
+# Port 80 check
+print_step "Checking for port 80 conflicts..."
+if ss -tlnp | grep ':80 ' | grep -vq 'apache2'; then
+  echo -e "${BRED}WARNING: Port 80 is already in use by a non-Apache process.${NC}"
+  echo -e "FreePBX may fail to start or the GUI may be unreachable."
+  echo -e "Investigate with: ${WHT}ss -tlnp | grep ':80'${NC}"
+else
+  echo -e "No port 80 conflicts detected. ${WHT}OK to proceed.${NC}"
+fi
+sleep $SLEEP_DELAY
+
+# DNS resolution check
+print_step "Checking DNS resolution..."
+if ! host cloudflare.com >/dev/null 2>&1; then
+  echo -e "${BRED}DNS resolution failed. Please fix DNS before proceeding.${NC}"
+  exit 1
+else
+  echo -e "DNS resolution working. ${WHT}OK to proceed.${NC}"
+  sleep $SLEEP_DELAY
+fi
+
+# curl availability check
+print_step "Checking for curl..."
+if ! command -v curl >/dev/null 2>&1; then
+  echo -e "${BRED}WARNING: curl not found. ${BYEL}Installing now...${NC}"
+apt install -y curl
+  echo
+  echo -e "curl installed successfully. ${WHT}OK to proceed.${NC}"
+  echo
+else
+  echo -e "curl is installed. ${WHT}OK to proceed.${NC}"
+  echo
+fi
+sleep $SLEEP_DELAY
+
+# GitHub installer
+print_step "Checking for FreePBX GitHub installer at raw.githubusercontent.com..."
+echo
+if ! curl -sSfI --max-time 10 https://raw.githubusercontent.com/FreePBX/sng_freepbx_debian_install/master/sng_freepbx_debian_install.sh >/dev/null; then
+  echo -e "${BRED}Unable to reach GitHub-hosted FreePBX installer.${NC}"
+  echo -e "Check your internet connection, DNS, or firewall restrictions."
+  echo
+  echo -e "${BRED}Exiting, IN1CLICK cannot continue without the installer script.${NC}"
+  echo
+  exit 1
+else
+  echo -e "FreePBX GitHub installer is reachable. ${WHT}OK to proceed.${NC}"
+fi
+sleep $SLEEP_DELAY
+
+# APT mirror check
+print_step "Checking FreePBX mirrors..."
+if ! curl -sSfI --max-time 10 http://deb.freepbx.org/freepbx17-prod/dists/bookworm/main/binary-amd64/Packages.gz >/dev/null; then
+  echo -e "${BRED}Unable to reach deb.freepbx.org (APT repository).${NC}"
+  echo -e "This will prevent FreePBX 17 packages from installing correctly."
+  echo
+  echo -e "${BRED}Exiting, IN1CLICK is not appropriate for this installation.${NC}"
+  echo
+  exit 1
+else
+  echo -e "FreePBX APT mirror is reachable. ${WHT}OK to proceed.${NC}"
+  echo
+fi
+sleep $SLEEP_DELAY
+
+# Legacy mirror (mirror.freepbx.org)
+if ! curl -sSfI --max-time 10 https://mirror.freepbx.org/ >/dev/null; then
+  echo -e "${BRED}Unable to reach mirror.freepbx.org (legacy mirror).${NC}"
+  echo -e "This may affect some modules or signatures."
+  echo
+  echo -e "${BRED}Exiting, IN1CLICK cannot continue while this mirror is unreachable.${NC}"
+  echo
+  exit 1
+else
+  echo -e "Legacy FreePBX mirror is reachable. ${WHT}OK to proceed.${NC}"
+  echo
+fi
+sleep $SLEEP_DELAY
+
+# Debian base mirror
+if ! curl -sSfI --max-time 10 http://ftp.debian.org/debian/ >/dev/null; then
+  echo -e "${BRED}Unable to reach Debian base mirror (ftp.debian.org).${NC}"
+  echo -e "APT will fail to fetch base packages during installation."
+  echo
+  echo -e "${BRED}Exiting, IN1CLICK cannot continue without Debian base packages.${NC}"
+  echo
+  exit 1
+else
+  echo -e "Debian base mirror is reachable. ${WHT}OK to proceed.${NC}"
+  echo
+fi
+sleep $SLEEP_DELAY
+
+# Simulated FreePBX install failure (LEAVE EVERYTHING COMMENTED OUT)
+#print_step "Installing FreePBX 17..."
+#sleep $SLEEP_DELAY
+#cd /usr/src
+#wget -q https://raw.githubusercontent.com/FreePBX/sng_freepbx_debian_install/master/sng_freepbx_debian_install.sh -O freepbx17-install.sh
+#chmod +x freepbx17-install.sh
+#sed -i '1i exit 1' freepbx17-install.sh
+#./freepbx17-install.sh || handle_install_failure
+#sleep $SLEEP_DELAY
+
+# Sangoma Official FreePBX Installation
+print_step "Installing FreePBX 17..."
+sleep $SLEEP_DELAY
+cd /usr/src
+wget -q https://raw.githubusercontent.com/FreePBX/sng_freepbx_debian_install/master/sng_freepbx_debian_install.sh -O freepbx17-install.sh
+chmod +x freepbx17-install.sh
+./freepbx17-install.sh || handle_install_failure
+sleep $SLEEP_DELAY
+
+# Modules upgrade
+print_step "Upgrading FreePBX modules..."
+fwconsole ma upgradeall || echo -e "${BRED}Module upgrade step completed with some warnings. ${BYEL}Continuing anyway...${NC}"
+fwconsole chown
+
+# Reload FreePBX
+echo
+echo -e "Attempting FreePBX reload..."
+if ! fwconsole reload; then
+  echo -e "${BRED}Initial reload failed. Retrying in 15 seconds...${NC}"
+  sleep $SLEEP_DELAY
+  sleep 15
+  if ! fwconsole reload; then
+    echo -e "${BRED}Second reload also failed. Continuing anyway...${NC}"
+  else
+    echo -e "Second reload succeeded. ${WHT}OK to proceed.${NC}"
+  fi
+else
+  echo -e "Modules upgraded and system reloaded. ${WHT}OK to proceed.${NC}"
+fi
+
+# Apache status check
+print_step "Checking if Apache is running..."
+if systemctl is-active --quiet apache2; then
+  echo -e "Apache is running. ${WHT}OK to proceed.${NC}"
+else
+  echo -e "${BRED}Apache is not running. Check service status manually.${NC}"
+fi
+sleep $SLEEP_DELAY
+
+# FreePBX GUI access instructions
+print_step "Accessing the FreePBX GUI..."
+IP_ADDR=$(hostname -I | awk '{print $1}')
+echo -e "Go to http://${IP_ADDR} in your preferred web browser. ${WHT}OK to proceed.${NC}"
+sleep $SLEEP_DELAY
+
+# Remove Asterisk logs and system mail for a clean post-install state
+print_step "Cleaning Asterisk logs..."
+rm -f /var/log/asterisk/full /var/log/asterisk/fail2ban /var/spool/mail/root
+echo -e "Full, fail2ban, and root mail cleared. ${WHT}OK to proceed.${NC}"
+sleep $SLEEP_DELAY
+
+# Clear interactive bash history from current session
+print_step "Clearing bash history..."
+unset HISTFILE && history -c
+echo -e "Bash history cleared. ${WHT}OK to proceed.${NC}"
+echo
+sleep $SLEEP_DELAY
+
+
+# Wait up to 60s for user to press Enter, or continue automatically if non-interactive
+echo -e "${BRED}WARNING: System will reboot in 60 seconds...${NC}"
+echo
+echo -e "${BYEL}Press Enter to reboot now or Ctrl+C to cancel.${NC}"
+echo
+if [ -t 0 ]; then
+  read -t 60 -r || true
+else
+  sleep 60
+fi
+
+# IN1CLICK leave-no-trace cleanup
+SCRIPT_PATH=$(realpath "$0")
+echo "Attempting to delete IN1CLICK by 20tele.com: $SCRIPT_PATH"
+echo
+if [[ -w "$SCRIPT_PATH" ]]; then
+  if rm -- "$SCRIPT_PATH"; then
+    echo "IN1CLICK by 20tele.com removed successfully."
+  else
+    echo "WARNING: Failed to delete the script file: $SCRIPT_PATH"
+  fi
+else
+  echo "WARNING: Script file is not writable. Skipping deletion."
+fi
+
+# Install duration
+END_TIME=$(date +%s)
+ELAPSED=$((END_TIME - START_TIME))
+echo
+echo -e "${WHT}IN1CLICK completed in $((ELAPSED / 60)) min $((ELAPSED % 60)) sec.${NC}"
+echo
+echo -e "${LBLUE}Goodbye.${NC}"
+echo
+sync
+reboot
