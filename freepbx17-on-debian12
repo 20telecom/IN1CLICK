@@ -76,7 +76,6 @@ handle_install_failure() {
 sleep 4
 
 # Welcome
-echo
 echo -e "${LBLUE}Hello. Thanks for using IN1CLICK for FreePBX 17 on Debian 12 [$VERSION] by 20tele.com${NC}"
 sleep $SLEEP_DELAY
 
@@ -313,13 +312,11 @@ apt install -y curl
   echo
 else
   echo -e "curl is installed. ${WHT}OK to proceed.${NC}"
-  echo
 fi
 sleep $SLEEP_DELAY
 
 # GitHub installer
 print_step "Checking for FreePBX GitHub installer at raw.githubusercontent.com..."
-echo
 if ! curl -sSfI --max-time 10 https://raw.githubusercontent.com/FreePBX/sng_freepbx_debian_install/master/sng_freepbx_debian_install.sh >/dev/null; then
   echo -e "${BRED}Unable to reach GitHub-hosted FreePBX installer.${NC}"
   echo -e "Check your internet connection, DNS, or firewall restrictions."
@@ -371,7 +368,6 @@ if ! curl -sSfI --max-time 10 http://ftp.debian.org/debian/ >/dev/null; then
   exit 1
 else
   echo -e "Debian base mirror is reachable. ${WHT}OK to proceed.${NC}"
-  echo
 fi
 sleep $SLEEP_DELAY
 
