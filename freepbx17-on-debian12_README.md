@@ -2,7 +2,7 @@
 
 ## Overview
 
-**IN1CLICK** is a streamlined, automated installer script for setting up FreePBX 17 on Debian 12. Designed by 20tele.com, the script simplifies the process by automating all necessary checks, system preparation, package installation, and post-install tasks. It also removes itself on completion, leaving no trace behind.
+**IN1CLICK** is a streamlined, automated installer script for setting up FreePBX 17 on Debian 12. Developed by 20tele.com, the script simplifies the process by automating all necessary checks, system preparation, package installation, and post-install tasks. It also removes itself on completion, leaving no trace behind.
 
 ---
 
