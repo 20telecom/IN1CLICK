@@ -1,4 +1,12 @@
-# IN1CLICK — FreePBX 17 on Debian 12 [1.0.0]
+# IN1CLICK — FreePBX 17 on Debian 12 [1.0.1]
+
+# Version Update
+
+From 1.0.0 to 1.0.1 on 15th August 2025 16:15 BST by kierknoby
+
+Added "Operating System Check 2" to ensure system is still Debian 12 (bookworm) after update/upgrade and before proceeding. This is now freepbx17-on-debian12 [1.0.1].
+
+---
 
 ## Overview
 
@@ -21,6 +29,7 @@ Please test it thoroughly in a controlled environment before deploying.
 - Validates IP assignment (static or DHCP).
 - Verifies and installs required packages including curl, iptables, and others.
 - Confirms availability of Debian and FreePBX mirrors before continuing.
+- OS version re-check to ensure Debian did not upgrade from 12 (bookworm) to 13 (trixie).
 - Detects desktop environments and warns users to use a minimal server install.
 - Uses the official FreePBX install script from Sangoma.
 - Automatically upgrades modules and reloads FreePBX.
@@ -59,10 +68,10 @@ Checking if this is Debian 12...
 Debian 12 confirmed. OK to proceed.
 
 Checking available disk space...
-Disk space available: 38.12 GB. OK to proceed.
+Disk space available: 16.47 GB. OK to proceed.
 
 Checking available memory and swap...
-Memory: 1987 MB, Swap: 0 MB. OK to proceed.
+Memory: 954 MB, Swap: 2399 MB. OK to proceed.
 
 Checking system architecture...
 Architecture is 64-bit. OK to proceed.
@@ -96,6 +105,9 @@ All package lists updated. OK to proceed.
 
 Upgrading packages... Please be patient.
 Packages upgraded successfully. OK to proceed.
+
+Checking this is still Debian 12...
+Debian 12 confirmed. OK to proceed.
 
 Checking IP assignment type...
 Static IP detected. OK to proceed.
