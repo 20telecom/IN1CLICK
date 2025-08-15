@@ -1,5 +1,5 @@
 #!/bin/bash
-VERSION="1.0.0"
+VERSION="1.0.1"
 
 #0################# IN1CLICK for FreePBX on Debian 12 ###################
 #
@@ -21,7 +21,7 @@ VERSION="1.0.0"
 # ${VERSION}
 #
 # PUBLISHED:
-# 5th July 2025
+# 15th August 2025 16:15 BST
 #
 # LICENSE:
 # GNU General Public License v3.0
@@ -79,7 +79,7 @@ sleep 4
 echo -e "${LBLUE}Hello. Thanks for using IN1CLICK for FreePBX 17 on Debian 12 [$VERSION] by 20tele.com${NC}"
 sleep $SLEEP_DELAY
 
-# Operating System check
+# Operating System check 1
 print_step "Checking if this is Debian 12..."
 if grep -q 'Debian GNU/Linux 12' /etc/os-release; then
   echo -e "Debian 12 confirmed. ${WHT}OK to proceed.${NC}"
@@ -231,6 +231,16 @@ else
   echo -e "Packages upgraded successfully. ${WHT}OK to proceed.${NC}"
 fi
 sleep $SLEEP_DELAY
+
+# Operating System check 2
+print_step "Checking this is still Debian 12..."
+if grep -q 'Debian GNU/Linux 12' /etc/os-release; then
+  echo -e "Debian 12 confirmed. ${WHT}OK to proceed.${NC}"
+  sleep $SLEEP_DELAY
+else
+  echo -e "${BRED}This script is only supported on Debian 12. Exiting, IN1CLICK is not appropriate for this installation.${NC}"
+  exit 1
+fi
 
 # IPv4 interface and assignment type check
 print_step "Checking IP assignment type..."
