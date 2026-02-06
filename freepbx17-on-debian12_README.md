@@ -51,13 +51,13 @@ Please test it thoroughly in a controlled environment before deploying.
 
 ## One-Click Installation on Debian 12
 
-Option 1: Run this curl command as root:
+Option 1: On a fresh Debian 12 installation, run this curl command as root:
 
 ```bash
 curl freepbx.in1.click | sh
 ```
 
-Option 2: Run this wget command as root:
+Option 2: On a fresh Debian 12 installation, run this wget command as root:
 
 ```bash
 wget https://raw.githubusercontent.com/20telecom/IN1CLICK/main/freepbx17-on-debian12 -O /tmp/IN1CLICK && chmod +x /tmp/IN1CLICK && /tmp/IN1CLICK
