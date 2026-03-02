@@ -1,5 +1,5 @@
 #!/bin/bash
-VERSION="1.1.0"
+VERSION="1.2.0"
 
 #0################# IN1CLICK for FreePBX on Debian 12 ###################
 #
@@ -21,7 +21,7 @@ VERSION="1.1.0"
 # ${VERSION}
 #
 # PUBLISHED:
-# 2nd March 2026 19:00 GMT
+# 2nd March 2026 21:00 GMT
 #
 # LICENSE:
 # GNU General Public License v3.0
@@ -58,11 +58,10 @@ countdown() {
 }
 
 # Welcome
-sleep 4
 echo -e "${CYAN}Hello. Thanks for trying IN1CLICK for FreePBX 17 on Debian 12 (bookworm).${NC}"
 sleep $SLEEP_DELAY
 echo
-echo -e "${BYEL}In case you need support from 20tele.com, this is IN1CLICK version 1.1.0.${NC}"
+echo -e "${BYEL}In case you need support from 20tele.com, this is IN1CLICK version ${VERSION}.${NC}"
 
 # Function to print section headers
 print_step() {
@@ -343,7 +342,7 @@ while fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/cache/apt/a
   fi
   LOCK_WAIT=$((LOCK_WAIT + 1))
   if [ "$LOCK_WAIT" -ge 300 ]; then
-    echo -e "${BRED}APT lock still held after 5 minutes. Exiting.${NC}"
+    echo -e "${BRED}APT lock still held after 2 minutes. Exiting.${NC}"
     exit 1
   fi
   sleep 1
@@ -682,8 +681,8 @@ while fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/cache/apt/a
     echo -e "${BYEL}Another package manager is running. Waiting for it to finish...${NC}"
   fi
   LOCK_WAIT=$((LOCK_WAIT + 1))
-  if [ "$LOCK_WAIT" -ge 300 ]; then
-    echo -e "${BRED}APT lock still held after 5 minutes. Exiting.${NC}"
+  if [ "$LOCK_WAIT" -ge 120 ]; then
+    echo -e "${BRED}APT lock still held after 2 minutes. Exiting.${NC}"
     exit 1
   fi
   sleep 1
