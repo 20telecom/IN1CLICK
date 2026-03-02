@@ -828,6 +828,22 @@ echo -e "Bash history cleared. ${WHT}OK to proceed.${NC}"
 echo
 sleep $SLEEP_DELAY
 
+# IN1CLICK leave-no-trace cleanup (skip on Heqet, script is managed by the ISO)
+if [ "$IS_HEQET" = false ]; then
+  SCRIPT_PATH=$(realpath "$0")
+  echo "Attempting to delete IN1CLICK by 20tele.com: $SCRIPT_PATH"
+  echo
+  if [[ -w "$SCRIPT_PATH" ]]; then
+    if rm -- "$SCRIPT_PATH"; then
+      echo "IN1CLICK by 20tele.com removed successfully."
+    else
+      echo "WARNING: Failed to delete the script file: $SCRIPT_PATH"
+    fi
+  else
+    echo "WARNING: Script file is not writable. Skipping deletion."
+  fi
+fi
+
 # Install duration
 END_TIME=$(date +%s)
 ELAPSED=$((END_TIME - START_TIME))
