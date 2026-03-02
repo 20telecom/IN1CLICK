@@ -37,7 +37,6 @@ START_TIME=$(date +%s)
 # Colours
 BGRN='\033[1;32m'
 BRED='\033[1;31m'
-LBLUE='\033[1;94m'
 CYAN='\033[38;5;51m'
 BYEL='\e[93m'
 WHT='\033[1;37m'
@@ -89,10 +88,20 @@ handle_install_failure() {
   echo -e "  ${BYEL}- Use WinSCP (Windows): File protocol: SCP, Host name: enter your IP address, Port: 22, login, go to:${NC}"
   echo -e "      ${WHT}/var/log/pbx/freepbx-*.log${NC}"
   echo -e "  ${BYEL}If you need help, email the log to support@20tele.com or open a ticket at https://support.20tele.com${NC}"
-  echo -e "${BRED}IN1CLICK is now exiting due to a failed FreePBX install. ${LBLUE}Goodbye.${NC}"
+  echo -e "${BRED}IN1CLICK is now exiting due to a failed FreePBX install. ${CYAN}Goodbye.${NC}"
   exit 1
 }
 sleep 4
+
+# Disable unattended-upgrades to prevent APT lock conflicts during install
+print_step "Disabling unattended-upgrades for this session..."
+systemctl stop unattended-upgrades 2>/dev/null || true
+systemctl stop apt-daily.timer 2>/dev/null || true
+systemctl stop apt-daily-upgrade.timer 2>/dev/null || true
+systemctl stop apt-daily.service 2>/dev/null || true
+systemctl stop apt-daily-upgrade.service 2>/dev/null || true
+echo -e "Unattended upgrades disabled for this session. ${WHT}OK to proceed.${NC}"
+sleep $SLEEP_DELAY
 
 # Heqet ISO detection (used to skip interactive prompts during unattended install)
 IS_HEQET=false
@@ -220,7 +229,7 @@ if [[ -f /etc/freepbx.conf || -d /var/www/html/admin ]]; then
     echo
     echo -e "${WHT}  2. If the problem persists, email ${BYEL}support@20tele.com${NC}"
     echo
-    echo -e "${LBLUE}IN1CLICK is exiting. Goodbye.${NC}"
+    echo -e "${CYAN}IN1CLICK is exiting. Goodbye.${NC}"
     echo
   else
     echo -e "${BRED}Stopping. FreePBX is already installed. Exiting, IN1CLICK is not appropriate for this installation.${NC}"
@@ -241,7 +250,7 @@ if command -v asterisk >/dev/null 2>&1 || systemctl list-units --type=service | 
     echo -e "${WHT}A previous installation may have failed or partially completed.${NC}"
     echo -e "${WHT}Boot from the Heqet ISO to start a fresh installation.${NC}"
     echo
-    echo -e "${LBLUE}IN1CLICK is exiting. Goodbye.${NC}"
+    echo -e "${CYAN}IN1CLICK is exiting. Goodbye.${NC}"
     echo
   else
     echo -e "${BRED}Stopping. Asterisk is already installed. Exiting, IN1CLICK is not appropriate for this installation.${NC}"
@@ -262,7 +271,7 @@ if systemctl list-units --type=service | grep -q 'mariadb' || command -v mariadb
     echo -e "${WHT}A previous installation may have failed or partially completed.${NC}"
     echo -e "${WHT}Boot from the Heqet ISO to start a fresh installation.${NC}"
     echo
-    echo -e "${LBLUE}IN1CLICK is exiting. Goodbye.${NC}"
+    echo -e "${CYAN}IN1CLICK is exiting. Goodbye.${NC}"
     echo
   else
     echo -e "${BRED}Stopping. MariaDB is already installed. Exiting, IN1CLICK is not appropriate for this installation.${NC}"
@@ -395,7 +404,7 @@ IFACE=$(ip -o -4 addr show | awk '{print $2}' | head -n1)
 if [[ -z "$IFACE" ]]; then
   echo -e "${BRED}No active network interface with an IPv4 address was found. ${WHT}IN1CLICK cannot continue.${NC}"
   echo
-  echo -e "${LBLUE}Goodbye.${NC}"
+  echo -e "${CYAN}Goodbye.${NC}"
   echo
   exit 1
 fi
@@ -565,7 +574,7 @@ if [ "$MIRROR_OK" = false ]; then
       echo
       echo -e "${WHT}  3. If the problem persists, email ${BYEL}support@20tele.com${NC}"
       echo
-      echo -e "${LBLUE}IN1CLICK is abandoning the installation. Goodbye.${NC}"
+      echo -e "${CYAN}IN1CLICK is abandoning the installation. Goodbye.${NC}"
       echo
       exit 1
     fi
@@ -610,11 +619,11 @@ if [ "$MIRROR_OK" = false ]; then
         echo
         echo "You can restart IN1CLICK with the following command:"
         echo
-        echo "curl freepbx.in1click | sh"
+        echo "curl https://freepbx.in1.click | sh"
         echo
         echo "Email support@20tele.com for help."
         echo
-        echo "Goodbye."
+        echo -e "${CYAN}Goodbye.${NC}"
         exit 1
         ;;
       *)
@@ -765,7 +774,6 @@ sleep $SLEEP_DELAY
 print_step "Cleaning Asterisk logs..."
 rm -f /var/log/asterisk/full /var/log/asterisk/fail2ban /var/spool/mail/root
 echo -e "Full, fail2ban, and root mail cleared. ${WHT}OK to proceed.${NC}"
-echo
 sleep $SLEEP_DELAY
 
 # Remove Heqet ISO components (if present)
@@ -823,10 +831,9 @@ sleep $SLEEP_DELAY
 # Install duration
 END_TIME=$(date +%s)
 ELAPSED=$((END_TIME - START_TIME))
-echo
 echo -e "${WHT}IN1CLICK completed in $((ELAPSED / 60)) min $((ELAPSED % 60)) sec.${NC}"
 echo
-echo -e "${LBLUE}Goodbye.${NC}"
+echo -e "${CYAN}Goodbye.${NC}"
 echo
 sleep 4
 
