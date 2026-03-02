@@ -1,5 +1,5 @@
 #!/bin/bash
-VERSION="K.0.12"
+VERSION="1.1.0"
 
 #0################# IN1CLICK for FreePBX on Debian 12 ###################
 #
@@ -21,7 +21,7 @@ VERSION="K.0.12"
 # ${VERSION}
 #
 # PUBLISHED:
-# 2nd March 2026 18:00 GMT
+# 2nd March 2026 16:30 GMT
 #
 # LICENSE:
 # GNU General Public License v3.0
@@ -62,6 +62,11 @@ print_step() {
   echo -e "\n${BGRN}$1${NC}\n"
 }
 
+# Welcome
+echo
+echo -e "${LBLUE}Hello. Thanks for using IN1CLICK for FreePBX 17 on Debian 12 [$VERSION] by 20tele.com${NC}"
+sleep 6
+
 # Heqet ISO detection (used to skip interactive prompts during unattended install)
 IS_HEQET=false
 print_step "Checking if this is the Heqet ISO..."
@@ -97,11 +102,6 @@ handle_install_failure() {
   exit 1
 }
 sleep 4
-
-# Welcome
-echo
-echo -e "${LBLUE}Hello. Thanks for using IN1CLICK for FreePBX 17 on Debian 12 [$VERSION] by 20tele.com${NC}"
-sleep 6
 
 # Operating System check 1
 print_step "Checking if this is Debian 12..."
