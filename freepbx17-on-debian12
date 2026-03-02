@@ -342,7 +342,7 @@ while fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/cache/apt/a
   fi
   LOCK_WAIT=$((LOCK_WAIT + 1))
   if [ "$LOCK_WAIT" -ge 300 ]; then
-    echo -e "${BRED}APT lock still held after 2 minutes. Exiting.${NC}"
+    echo -e "${BRED}APT lock still held after 5 minutes. Exiting.${NC}"
     exit 1
   fi
   sleep 1
@@ -681,8 +681,8 @@ while fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/cache/apt/a
     echo -e "${BYEL}Another package manager is running. Waiting for it to finish...${NC}"
   fi
   LOCK_WAIT=$((LOCK_WAIT + 1))
-  if [ "$LOCK_WAIT" -ge 120 ]; then
-    echo -e "${BRED}APT lock still held after 2 minutes. Exiting.${NC}"
+  if [ "$LOCK_WAIT" -ge 300 ]; then
+    echo -e "${BRED}APT lock still held after 5 minutes. Exiting.${NC}"
     exit 1
   fi
   sleep 1
