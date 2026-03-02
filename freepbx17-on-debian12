@@ -323,6 +323,27 @@ else
 fi
 sleep $SLEEP_DELAY
 
+# Wait for any existing apt/dpkg locks to clear, 1 of 2.
+print_step "Checking for APT locks before updating packages..."
+LOCK_WAIT=0
+while fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/cache/apt/archives/lock >/dev/null 2>&1; do
+  if [ "$LOCK_WAIT" -eq 0 ]; then
+    echo -e "${BYEL}Another package manager is running. Waiting for it to finish...${NC}"
+  fi
+  LOCK_WAIT=$((LOCK_WAIT + 1))
+  if [ "$LOCK_WAIT" -ge 300 ]; then
+    echo -e "${BRED}APT lock still held after 2 minutes. Exiting.${NC}"
+    exit 1
+  fi
+  sleep 1
+done
+if [ "$LOCK_WAIT" -gt 0 ]; then
+  echo -e "Lock released after ${LOCK_WAIT} seconds. ${WHT}OK to proceed.${NC}"
+else
+  echo -e "No APT locks detected. ${WHT}OK to proceed.${NC}"
+fi
+sleep $SLEEP_DELAY
+
 # System Preparation
 print_step "Updating package lists..."
 apt update -qq > /dev/null 2>&1
@@ -642,15 +663,26 @@ else
 fi
 sleep 4
 
-# Simulated FreePBX install failure (LEAVE EVERYTHING COMMENTED OUT)
-#print_step "Installing FreePBX 17..."
-#sleep $SLEEP_DELAY
-#cd /usr/src
-#wget -q https://raw.githubusercontent.com/FreePBX/sng_freepbx_debian_install/master/sng_freepbx_debian_install.sh -O freepbx17-install.sh
-#chmod +x freepbx17-install.sh
-#sed -i '1i exit 1' freepbx17-install.sh
-#./freepbx17-install.sh || handle_install_failure
-#sleep $SLEEP_DELAY
+# Wait for any existing apt/dpkg locks to clear, 2 of 2.
+print_step "Checking for APT locks before installing FreePBX 17..."
+LOCK_WAIT=0
+while fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/cache/apt/archives/lock >/dev/null 2>&1; do
+  if [ "$LOCK_WAIT" -eq 0 ]; then
+    echo -e "${BYEL}Another package manager is running. Waiting for it to finish...${NC}"
+  fi
+  LOCK_WAIT=$((LOCK_WAIT + 1))
+  if [ "$LOCK_WAIT" -ge 120 ]; then
+    echo -e "${BRED}APT lock still held after 2 minutes. Exiting.${NC}"
+    exit 1
+  fi
+  sleep 1
+done
+if [ "$LOCK_WAIT" -gt 0 ]; then
+  echo -e "Lock released after ${LOCK_WAIT} seconds. ${WHT}OK to proceed.${NC}"
+else
+  echo -e "No APT locks detected. ${WHT}OK to proceed.${NC}"
+fi
+sleep $SLEEP_DELAY
 
 # Sangoma Official FreePBX Installation
 print_step "Installing FreePBX 17..."
