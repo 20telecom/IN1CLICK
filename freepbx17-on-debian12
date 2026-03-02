@@ -60,23 +60,13 @@ countdown() {
 # Welcome
 echo -e "${LBLUE}Hello. Thanks for using IN1CLICK for FreePBX 17 on Debian 12 (bookworm)${NC}"
 sleep $SLEEP_DELAY
+echo
 echo -e "${BYEL}In case you need support from 20tele.com, this is IN1CLICK version 1.1.0${NC}"
 
 # Function to print section headers
 print_step() {
   echo -e "\n${BGRN}$1${NC}\n"
 }
-
-# Heqet ISO detection (used to skip interactive prompts during unattended install)
-IS_HEQET=false
-print_step "Checking if this is the Heqet ISO..."
-if [ -f /etc/systemd/system/in1click-firstboot.service ] || [ -f /etc/systemd/system/in1click-cleanup.service ]; then
-  IS_HEQET=true
-  echo -e "Heqet ISO detected. ${WHT}OK to proceed.${NC}"
-else
-  echo -e "Not the Heqet ISO. ${WHT}OK to proceed.${NC}"
-fi
-sleep $SLEEP_DELAY
 
 # If FreePBX Installation Fails
 handle_install_failure() {
@@ -102,6 +92,17 @@ handle_install_failure() {
   exit 1
 }
 sleep 4
+
+# Heqet ISO detection (used to skip interactive prompts during unattended install)
+IS_HEQET=false
+print_step "Checking if this is the Heqet ISO..."
+if [ -f /etc/systemd/system/in1click-firstboot.service ] || [ -f /etc/systemd/system/in1click-cleanup.service ]; then
+  IS_HEQET=true
+  echo -e "Heqet ISO detected. ${WHT}OK to proceed.${NC}"
+else
+  echo -e "Not the Heqet ISO. ${WHT}OK to proceed.${NC}"
+fi
+sleep $SLEEP_DELAY
 
 # Operating System check 1
 print_step "Checking if this is Debian 12..."
