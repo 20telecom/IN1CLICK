@@ -488,7 +488,7 @@ while [ "$MIRROR_ATTEMPTS" -lt "$MIRROR_MAX" ]; do
 
   if [ "$mirror_status" = "good" ]; then
     MIRROR_GOOD_COUNT=$((MIRROR_GOOD_COUNT + 1))
-    echo -e "Mirrors are stable. ${WHT}($MIRROR_GOOD_COUNT/$MIRROR_MAX passed)${NC}"
+    echo -e "Check out https://in1.click/mirrors in a web browser. ${WHT}($MIRROR_GOOD_COUNT/$MIRROR_MAX passed)${NC}"
   elif [ "$mirror_status" = "unreachable" ]; then
     echo -e "${BRED}Could not reach the mirror checker at in1.click.${NC}"
   elif [ "$mirror_status" = "bad" ]; then
@@ -569,7 +569,7 @@ if [ "$MIRROR_OK" = false ]; then
           mirror_check_once
           if [ "$mirror_status" = "good" ]; then
             MIRROR_GOOD_COUNT=$((MIRROR_GOOD_COUNT + 1))
-            echo -e "Check out https://in1.click/mirrors in a web broweser. ${WHT}($MIRROR_GOOD_COUNT/$MIRROR_MAX passed)${NC}"
+            echo -e "Check out https://in1.click/mirrors in a web browser. ${WHT}($MIRROR_GOOD_COUNT/$MIRROR_MAX passed)${NC}"
           fi
           if [ "$MIRROR_ATTEMPTS" -lt "$MIRROR_MAX" ]; then
             countdown 30
