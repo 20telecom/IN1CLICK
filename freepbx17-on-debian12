@@ -58,6 +58,7 @@ countdown() {
 }
 
 # Welcome
+sleep 4
 echo -e "${CYAN}Hello. Thanks for trying IN1CLICK for FreePBX 17 on Debian 12 (bookworm).${NC}"
 sleep $SLEEP_DELAY
 echo
