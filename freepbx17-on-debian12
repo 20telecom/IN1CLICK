@@ -58,7 +58,7 @@ countdown() {
 }
 
 # Welcome
-echo -e "${LBLUE}Hello. Thanks for using IN1CLICK for FreePBX 17 on Debian 12 (bookworm)${NC}"
+echo -e "${LBLUE}Hello. Thanks for trying IN1CLICK for FreePBX 17 on Debian 12 (bookworm)${NC}"
 sleep $SLEEP_DELAY
 echo
 echo -e "${BYEL}In case you need support from 20tele.com, this is IN1CLICK version 1.1.0${NC}"
@@ -568,7 +568,7 @@ if [ "$MIRROR_OK" = false ]; then
           mirror_check_once
           if [ "$mirror_status" = "good" ]; then
             MIRROR_GOOD_COUNT=$((MIRROR_GOOD_COUNT + 1))
-            echo -e "Mirrors are stable. ${WHT}($MIRROR_GOOD_COUNT/$MIRROR_MAX passed)${NC}"
+            echo -e "Check out https://in1.click/mirrors in a web broweser. ${WHT}($MIRROR_GOOD_COUNT/$MIRROR_MAX passed)${NC}"
           fi
           if [ "$MIRROR_ATTEMPTS" -lt "$MIRROR_MAX" ]; then
             countdown 30
@@ -682,7 +682,7 @@ for UPGRADE_ATTEMPT in 1 2 3; do
 done
 
 if [ "$UPGRADE_MIRROR_OK" = true ]; then
-  echo -e "Mirrors are stable. ${WHT}Upgrading modules...${NC}"
+  echo -e "Check out https://in1.click/mirrors in a web browser. ${WHT}Upgrading modules...${NC}"
   echo
   fwconsole ma upgradeall || echo -e "${BYEL}Module upgrade completed with some warnings. Continuing anyway...${NC}"
 else
