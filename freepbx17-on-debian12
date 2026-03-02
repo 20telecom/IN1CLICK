@@ -59,10 +59,10 @@ countdown() {
 }
 
 # Welcome
-echo -e "${CYAN}Hello. Thanks for trying IN1CLICK for FreePBX 17 on Debian 12 (bookworm)${NC}"
+echo -e "${CYAN}Hello. Thanks for trying IN1CLICK for FreePBX 17 on Debian 12 (bookworm).${NC}"
 sleep $SLEEP_DELAY
 echo
-echo -e "${BYEL}In case you need support from 20tele.com, this is IN1CLICK version 1.1.0${NC}"
+echo -e "${BYEL}In case you need support from 20tele.com, this is IN1CLICK version 1.1.0.${NC}"
 
 # Function to print section headers
 print_step() {
