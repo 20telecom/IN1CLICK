@@ -21,7 +21,7 @@ VERSION="1.1.0"
 # ${VERSION}
 #
 # PUBLISHED:
-# 2nd March 2026 17:00 GMT
+# 2nd March 2026 19:00 GMT
 #
 # LICENSE:
 # GNU General Public License v3.0
@@ -38,6 +38,7 @@ START_TIME=$(date +%s)
 BGRN='\033[1;32m'
 BRED='\033[1;31m'
 LBLUE='\033[1;94m'
+CYAN='\033[38;5;51m'
 BYEL='\e[93m'
 WHT='\033[1;37m'
 NC='\033[0m'
@@ -58,7 +59,7 @@ countdown() {
 }
 
 # Welcome
-echo -e "${LBLUE}Hello. Thanks for trying IN1CLICK for FreePBX 17 on Debian 12 (bookworm)${NC}"
+echo -e "${CYAN}Hello. Thanks for trying IN1CLICK for FreePBX 17 on Debian 12 (bookworm)${NC}"
 sleep $SLEEP_DELAY
 echo
 echo -e "${BYEL}In case you need support from 20tele.com, this is IN1CLICK version 1.1.0${NC}"
