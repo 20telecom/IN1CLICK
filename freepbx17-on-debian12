@@ -21,7 +21,7 @@ VERSION="1.1.0"
 # ${VERSION}
 #
 # PUBLISHED:
-# 2nd March 2026 16:30 GMT
+# 2nd March 2026 17:00 GMT
 #
 # LICENSE:
 # GNU General Public License v3.0
@@ -57,15 +57,15 @@ countdown() {
   printf "\r                        \r"
 }
 
+# Welcome
+echo -e "${LBLUE}Hello. Thanks for using IN1CLICK for FreePBX 17 on Debian 12 (bookworm)${NC}"
+sleep $SLEEP_DELAY
+echo -e "${BYEL}In case you need support from 20tele.com, this is IN1CLICK version 1.1.0${NC}"
+
 # Function to print section headers
 print_step() {
   echo -e "\n${BGRN}$1${NC}\n"
 }
-
-# Welcome
-echo
-echo -e "${LBLUE}Hello. Thanks for using IN1CLICK for FreePBX 17 on Debian 12 [$VERSION] by 20tele.com${NC}"
-sleep 6
 
 # Heqet ISO detection (used to skip interactive prompts during unattended install)
 IS_HEQET=false
