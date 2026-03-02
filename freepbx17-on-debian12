@@ -285,7 +285,14 @@ sleep $SLEEP_DELAY
 
 # APT source check
 print_step "Checking APT sources and update availability..."
-if ! grep -qE 'deb(\.|-security\.)debian\.org' /etc/apt/sources.list && ! grep -qrE 'debian\.org' /etc/apt/sources.list.d; then
+APT_SOURCES_OK=false
+if [ -f /etc/apt/sources.list ] && grep -qE 'deb(\.|-security\.)debian\.org' /etc/apt/sources.list; then
+  APT_SOURCES_OK=true
+fi
+if grep -qrE 'debian\.org' /etc/apt/sources.list.d/ 2>/dev/null; then
+  APT_SOURCES_OK=true
+fi
+if [ "$APT_SOURCES_OK" = false ]; then
   echo -e "${BRED}Warning:${NC} APT sources do not appear to point to official Debian mirrors (e.g. deb.debian.org). Errors could occur due to outdated or unsupported packages. ${BYEL}Continuing anyway...${NC}"
 else
   echo -e "APT sources appear to be valid. ${WHT}OK to proceed.${NC}"
