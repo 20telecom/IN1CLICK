@@ -507,7 +507,8 @@ while [ "$MIRROR_ATTEMPTS" -lt "$MIRROR_MAX" ]; do
 done
 
 if [ "$MIRROR_GOOD_COUNT" -eq "$MIRROR_MAX" ]; then
-  echo -e "${BGRN}All $MIRROR_MAX checks passed. Great job, Sangoma. ${WHT}OK to proceed.${NC}"
+echo
+  echo -e "${BGRN}All $MIRROR_MAX checks passed. Great job, Sangoma! ${WHT}OK to proceed.${NC}"
   MIRROR_OK=true
 else
   MIRROR_OK=false
