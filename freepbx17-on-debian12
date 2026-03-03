@@ -1,5 +1,5 @@
 #!/bin/bash
-VERSION="1.2.0"
+VERSION="1.2.1"
 
 #0################# IN1CLICK for FreePBX on Debian 12 ###################
 #
@@ -21,7 +21,7 @@ VERSION="1.2.0"
 # ${VERSION}
 #
 # PUBLISHED:
-# 2nd March 2026 21:00 GMT
+# 3rd March 2026 13:00 GMT
 #
 # LICENSE:
 # GNU General Public License v3.0
@@ -481,6 +481,7 @@ else
 fi
 
 mirror_status=""
+deb_status=""
 mirror_check_once() {
   local output_file
   output_file="$(mktemp)"
@@ -488,10 +489,12 @@ mirror_check_once() {
     | sed '/^read -r -p/,$d' \
     | bash 2>&1 | tee "$output_file"; then
     mirror_status="unreachable"
+    deb_status="unknown"
     rm -f "$output_file"
     return
   fi
 
+  # Parse module mirror status
   if grep -Fq "It should be safe to proceed with module updates." "$output_file"; then
     mirror_status="good"
   elif grep -Fq "Degraded performance. Mirrors responding but not fully healthy — proceed with caution." "$output_file"; then
@@ -502,6 +505,19 @@ mirror_check_once() {
     mirror_status="server"
   else
     mirror_status="unknown"
+  fi
+
+  # Parse deb.freepbx.org APT repo status
+  if grep -Fq "Packages.gz valid" "$output_file"; then
+    deb_status="good"
+  elif grep -Fq "captcha page instead of Packages.gz" "$output_file"; then
+    deb_status="captcha"
+  elif grep -Fq "FreePBX installations will fail" "$output_file"; then
+    deb_status="bad"
+  elif grep -Fq "not valid gzip data" "$output_file"; then
+    deb_status="invalid"
+  else
+    deb_status="unknown"
   fi
 
   rm -f "$output_file"
@@ -517,9 +533,11 @@ while [ "$MIRROR_ATTEMPTS" -lt "$MIRROR_MAX" ]; do
   echo -e "\n${BGRN}Using mirrors.in1.click to check the official FreePBX mirrors... [attempt $MIRROR_ATTEMPTS]${NC}\n"
   mirror_check_once
 
-  if [ "$mirror_status" = "good" ]; then
+  if [ "$mirror_status" = "good" ] && [ "$deb_status" = "good" ]; then
     MIRROR_GOOD_COUNT=$((MIRROR_GOOD_COUNT + 1))
     echo -e "Check out https://in1.click/mirrors in a web browser. ${WHT}($MIRROR_GOOD_COUNT/$MIRROR_MAX passed)${NC}"
+  elif [ "$mirror_status" = "good" ] && [ "$deb_status" != "good" ]; then
+    echo -e "${BYEL}Module mirrors are stable but deb.freepbx.org (APT repo) is not healthy.${NC}"
   elif [ "$mirror_status" = "unreachable" ]; then
     echo -e "${BRED}Could not reach the mirror checker at in1.click.${NC}"
   elif [ "$mirror_status" = "bad" ]; then
@@ -598,7 +616,7 @@ if [ "$MIRROR_OK" = false ]; then
           MIRROR_ATTEMPTS=$((MIRROR_ATTEMPTS + 1))
           echo -e "\n${BGRN}Using mirrors.in1.click to check the official FreePBX mirrors... [attempt $MIRROR_ATTEMPTS]${NC}\n"
           mirror_check_once
-          if [ "$mirror_status" = "good" ]; then
+          if [ "$mirror_status" = "good" ] && [ "$deb_status" = "good" ]; then
             MIRROR_GOOD_COUNT=$((MIRROR_GOOD_COUNT + 1))
             echo -e "Check out https://in1.click/mirrors in a web browser. ${WHT}($MIRROR_GOOD_COUNT/$MIRROR_MAX passed)${NC}"
           fi
@@ -644,20 +662,6 @@ if ! curl -sSfI --max-time 10 https://raw.githubusercontent.com/FreePBX/sng_free
   exit 1
 else
   echo -e "FreePBX GitHub installer is reachable. ${WHT}OK to proceed.${NC}"
-fi
-sleep $SLEEP_DELAY
-
-# FreePBX APT repository check (for installing FreePBX and system packages)
-print_step "Checking FreePBX installation repository (deb.freepbx.org)..."
-if ! curl -sSfI --max-time 10 http://deb.freepbx.org/freepbx17-prod/dists/bookworm/main/binary-amd64/Packages.gz >/dev/null; then
-  echo -e "${BRED}Unable to reach deb.freepbx.org (APT repository).${NC}"
-  echo -e "This will prevent FreePBX 17 packages from installing correctly."
-  echo
-  echo -e "${BRED}Exiting, IN1CLICK is not appropriate for this installation.${NC}"
-  echo
-  exit 1
-else
-  echo -e "FreePBX APT repository is reachable. ${WHT}OK to proceed.${NC}"
 fi
 sleep $SLEEP_DELAY
 
