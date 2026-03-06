@@ -34,6 +34,44 @@ VERSION="1.2.2"
 # the install live. If SSH drops, they can reattach with: screen -r in1click
 if [ -z "${STY:-}" ]; then
   apt-get install -y screen -qq > /dev/null 2>&1
+
+  # Drop a login hook into /etc/profile.d/ so that if the user reconnects
+  # after an SSH disconnection, they are prompted to reattach, leave it
+  # running, or abort the install. The file timestamp is used to calculate
+  # how long the install has been running, to inform the abort warning.
+  # This file is removed by IN1CLICK on successful completion (see cleanup).
+  cat > /etc/profile.d/in1click-reattach.sh << 'PROFILE'
+#!/bin/bash
+if screen -ls in1click | grep -q in1click; then
+  echo
+  echo "IN1CLICK is still running in the background."
+  echo
+  echo "  1) Yes - watch the output"
+  echo "  2) No  - leave it running"
+  echo "  3) Kill it - abort install"
+  echo
+  read -r -p "  Choice [1]: " choice
+  case "${choice:-1}" in
+    1) screen -r in1click ;;
+    2) ;;
+    3)
+      ELAPSED=$(( $(date +%s) - $(stat -c %Y /etc/profile.d/in1click-reattach.sh) ))
+      echo
+      echo "  WARNING: IN1CLICK has been running for $((ELAPSED / 60)) min $((ELAPSED % 60)) sec."
+      echo "  Aborting now will leave your system in a broken state."
+      echo
+      read -r -p "  Are you sure? [y/N]: " confirm
+      if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        screen -S in1click -X stuff $'\003'
+        echo "  IN1CLICK aborted. Your system may be in a broken state."
+      fi
+      ;;
+  esac
+  echo
+fi
+PROFILE
+  chmod +x /etc/profile.d/in1click-reattach.sh
+
   exec screen -S in1click bash "$0" "$@"
 fi
 
@@ -891,6 +929,10 @@ sleep 4
 # Clean up the screen session that was created at the start of this script
 # to protect the install from SSH disconnection. Now that the install is
 # complete, we no longer need it. This leaves no orphaned screen sessions.
+#
+# Also remove the /etc/profile.d/ login hook that was created alongside the
+# screen session to prompt reconnecting users. No longer needed on success.
 if [ -n "${STY:-}" ]; then
+  rm -f /etc/profile.d/in1click-reattach.sh
   screen -S in1click -X quit
 fi
