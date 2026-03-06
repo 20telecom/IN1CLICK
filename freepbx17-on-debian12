@@ -1,5 +1,5 @@
 #!/bin/bash
-VERSION="1.2.1"
+VERSION="1.2.2"
 
 #0################# IN1CLICK for FreePBX on Debian 12 ###################
 #
@@ -21,7 +21,7 @@ VERSION="1.2.1"
 # ${VERSION}
 #
 # PUBLISHED:
-# 3rd March 2026 13:00 GMT
+# 6th March 2026 17:00 GMT
 #
 # LICENSE:
 # GNU General Public License v3.0
@@ -288,7 +288,6 @@ print_step "Checking for existing Node.js installation..."
 if command -v node >/dev/null 2>&1; then
   NODE_VERSION=$(node -v)
   echo -e "${BRED}WARNING: Node.js is already installed (${NODE_VERSION}). ${BYEL}Continuing anyway...${NC}"
-  IP_TYPE="Node.js already present"
 else
   echo -e "No existing Node.js installation found. ${WHT}OK to proceed.${NC}"
 fi
@@ -411,13 +410,10 @@ fi
 IP_INFO=$(ip -o -4 addr show "$IFACE")
 if echo "$IP_INFO" | grep -q 'dynamic'; then
   echo -e "${BRED}WARNING: IP appears to be dynamically assigned (DHCP).${BYEL} Continuing anyway...${NC}"
-  IP_TYPE="DHCP"
 elif echo "$IP_INFO" | grep -q 'inet'; then
   echo -e "Static IP detected. ${WHT}OK to proceed.${NC}"
-  IP_TYPE="Static (assumed)"
 else
   echo -e "${BRED}WARNING: Unable to determine IP assignment type. ${BYEL}Continuing anyway...${NC}"
-  IP_TYPE="Unknown"
 fi
 sleep $SLEEP_DELAY
 
@@ -530,7 +526,7 @@ MIRROR_GOOD_COUNT=0
 
 while [ "$MIRROR_ATTEMPTS" -lt "$MIRROR_MAX" ]; do
   MIRROR_ATTEMPTS=$((MIRROR_ATTEMPTS + 1))
-  echo -e "\n${BGRN}Using mirrors.in1.click to check the official FreePBX mirrors... [attempt $MIRROR_ATTEMPTS]${NC}\n"
+  echo -e "\n${BGRN}Using mirrors.in1.click to check the official FreePBX mirrors... [attempt $MIRROR_ATTEMPTS/$MIRROR_MAX]${NC}\n"
   mirror_check_once
 
   if [ "$mirror_status" = "good" ] && [ "$deb_status" = "good" ]; then
@@ -614,7 +610,7 @@ if [ "$MIRROR_OK" = false ]; then
         MIRROR_GOOD_COUNT=0
         while [ "$MIRROR_ATTEMPTS" -lt "$MIRROR_MAX" ]; do
           MIRROR_ATTEMPTS=$((MIRROR_ATTEMPTS + 1))
-          echo -e "\n${BGRN}Using mirrors.in1.click to check the official FreePBX mirrors... [attempt $MIRROR_ATTEMPTS]${NC}\n"
+          echo -e "\n${BGRN}Using mirrors.in1.click to check the official FreePBX mirrors... [attempt $MIRROR_ATTEMPTS/$MIRROR_MAX]${NC}\n"
           mirror_check_once
           if [ "$mirror_status" = "good" ] && [ "$deb_status" = "good" ]; then
             MIRROR_GOOD_COUNT=$((MIRROR_GOOD_COUNT + 1))
@@ -709,8 +705,11 @@ sleep $SLEEP_DELAY
 
 # Modules upgrade (re-check mirrors first - they may have degraded during install)
 UPGRADE_MIRROR_OK=false
-for UPGRADE_ATTEMPT in 1 2 3; do
-  echo -e "\n${BGRN}Using mirrors.in1.click to check the official FreePBX mirrors... [attempt $UPGRADE_ATTEMPT/3]${NC}\n"
+UPGRADE_ATTEMPT=0
+UPGRADE_MAX=$MIRROR_MAX
+while [ "$UPGRADE_ATTEMPT" -lt "$UPGRADE_MAX" ]; do
+  UPGRADE_ATTEMPT=$((UPGRADE_ATTEMPT + 1))
+  echo -e "\n${BGRN}Using mirrors.in1.click to check the official FreePBX mirrors... [attempt $UPGRADE_ATTEMPT/$UPGRADE_MAX]${NC}\n"
   mirror_check_once
   if [ "$mirror_status" = "good" ]; then
     UPGRADE_MIRROR_OK=true
@@ -723,7 +722,7 @@ for UPGRADE_ATTEMPT in 1 2 3; do
   else
     echo -e "${BYEL}Mirrors are not fully stable.${NC}"
   fi
-  if [ "$UPGRADE_ATTEMPT" -lt 3 ]; then
+  if [ "$UPGRADE_ATTEMPT" -lt "$UPGRADE_MAX" ]; then
     countdown 30
   fi
 done
@@ -737,14 +736,16 @@ else
   echo -e "${WHT}FreePBX is installed and working. You can upgrade modules later with:${NC}"
   echo -e "${BGRN}  fwconsole ma upgradeall${NC}"
 fi
+
+print_step "Setting correct file ownership..."
 fwconsole chown
+echo -e "File ownership set. ${WHT}OK to proceed.${NC}"
+sleep $SLEEP_DELAY
 
 # Reload FreePBX
-echo
-echo -e "Attempting FreePBX reload..."
+print_step "Reloading FreePBX..."
 if ! fwconsole reload; then
   echo -e "${BRED}Initial reload failed. Retrying in 15 seconds...${NC}"
-  sleep $SLEEP_DELAY
   sleep 15
   if ! fwconsole reload; then
     echo -e "${BRED}Second reload also failed. Continuing anyway...${NC}"
@@ -754,6 +755,20 @@ if ! fwconsole reload; then
 else
   echo -e "Modules upgraded and system reloaded. ${WHT}OK to proceed.${NC}"
 fi
+
+# Apache modules, site config and root redirect
+print_step "Configuring Apache for FreePBX..."
+a2enmod rewrite expires headers 2>/dev/null || true
+a2ensite freepbx.conf 2>/dev/null || true
+if ! grep -q 'RedirectMatch' /etc/apache2/sites-enabled/000-default.conf 2>/dev/null; then
+  sed -i 's|DocumentRoot /var/www/html|DocumentRoot /var/www/html\n\tRedirectMatch ^/$ /admin/|' /etc/apache2/sites-enabled/000-default.conf
+  echo -e "Root redirect to /admin/ added. ${WHT}OK to proceed.${NC}"
+else
+  echo -e "Root redirect already present. ${WHT}OK to proceed.${NC}"
+fi
+systemctl restart apache2
+echo -e "Apache configured and restarted. ${WHT}OK to proceed.${NC}"
+sleep $SLEEP_DELAY
 
 # Apache status check
 print_step "Checking if Apache is running..."
@@ -823,6 +838,14 @@ EOF
   echo -e "Cleanup complete. ${WHT}OK to proceed.${NC}"
   echo
   sleep $SLEEP_DELAY
+
+  # Restore getty on tty1 for login prompt after install (Heqet only)
+  print_step "Restoring login prompt on tty1..."
+  systemctl unmask getty@tty1.service
+  systemctl enable getty@tty1.service
+  systemctl restart getty@tty1.service
+  echo -e "Login prompt restored on tty1. ${WHT}OK to proceed.${NC}"
+  sleep $SLEEP_DELAY
 fi
 
 # Clear interactive bash history from current session
@@ -856,11 +879,3 @@ echo
 echo -e "${CYAN}Goodbye.${NC}"
 echo
 sleep 4
-
-# Restore getty on tty1 for login prompt after install (Heqet only)
-if [ "$IS_HEQET" = true ]; then
-  print_step "Restoring login prompt on tty1..."
-  systemctl unmask getty@tty1.service
-  systemctl enable getty@tty1.service
-  systemctl restart getty@tty1.service
-fi
