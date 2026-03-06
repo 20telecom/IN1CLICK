@@ -21,7 +21,7 @@ VERSION="1.2.2"
 # ${VERSION}
 #
 # PUBLISHED:
-# 6th March 2026 20:00 GMT
+# 6th March 2026 21:00 GMT
 #
 # LICENSE:
 # GNU General Public License v3.0
@@ -192,9 +192,14 @@ TOTAL_SWAP_KB=$(grep SwapTotal /proc/meminfo | awk '{print $2}')
 TOTAL_MEM_MB=$(( TOTAL_MEM_KB / 1024 ))
 TOTAL_SWAP_MB=$(( TOTAL_SWAP_KB / 1024 ))
 if (( TOTAL_MEM_MB < 1000 )) && (( TOTAL_SWAP_MB < 100 )); then
-  echo -e "${BRED}WARNING: Less than 1 GB RAM and no swap configured.${NC}"
-  echo -e "This may cause MariaDB, Apache, or Asterisk to crash during install or runtime."
-  echo -e "Consider adding swap with: ${WHT}fallocate -l 1G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile${NC}"
+  echo -e "${BRED}Insufficient memory. FreePBX 17 requires at least 1 GB RAM.${NC}"
+  echo -e "${WHT}This system has ${TOTAL_MEM_MB} MB RAM and no swap configured.${NC}"
+  echo -e "${WHT}The installer will be killed by the kernel before it completes.${NC}"
+  echo -e "${WHT}Please upgrade to a 1 GB or larger instance and try again.${NC}"
+  echo
+  echo -e "${CYAN}Goodbye.${NC}"
+  echo
+  exit 1
 else
   echo -e "Memory: ${TOTAL_MEM_MB} MB, Swap: ${TOTAL_SWAP_MB} MB. ${WHT}OK to proceed.${NC}"
 fi
