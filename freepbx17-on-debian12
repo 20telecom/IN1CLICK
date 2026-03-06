@@ -28,16 +28,13 @@ VERSION="1.2.2"
 #
 #1#######################################################################
 
-# Ensure install survives SSH disconnection
+# Ensure install survives SSH disconnection while keeping the user attached.
+# If we are not already inside a screen session, install screen silently,
+# then re-exec this script inside a named screen session. The user watches
+# the install live. If SSH drops, they can reattach with: screen -r in1click
 if [ -z "${STY:-}" ]; then
   apt-get install -y screen -qq > /dev/null 2>&1
-  screen -dmS in1click bash "$0" "$@"
-  echo
-  echo "IN1CLICK is running. To watch it:"
-  echo
-  echo "  screen -r in1click"
-  echo
-  exit 0
+  exec screen -S in1click bash "$0" "$@"
 fi
 
 # Exit on error, undefined variables, or pipeline failures
