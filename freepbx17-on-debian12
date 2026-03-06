@@ -63,6 +63,7 @@ if screen -ls in1click | grep -q in1click; then
       read -r -p "  Are you sure? [y/N]: " confirm
       if [[ "$confirm" =~ ^[Yy]$ ]]; then
         screen -S in1click -X stuff $'\003'
+        rm -f /etc/profile.d/in1click-reattach.sh
         echo "  IN1CLICK aborted. Your system may be in a broken state."
       fi
       ;;
