@@ -21,12 +21,24 @@ VERSION="1.2.2"
 # ${VERSION}
 #
 # PUBLISHED:
-# 6th March 2026 17:00 GMT
+# 6th March 2026 20:00 GMT
 #
 # LICENSE:
 # GNU General Public License v3.0
 #
 #1#######################################################################
+
+# Ensure install survives SSH disconnection
+if [ -z "${STY:-}" ]; then
+  apt-get install -y screen -qq > /dev/null 2>&1
+  screen -dmS in1click bash "$0" "$@"
+  echo
+  echo "IN1CLICK is running. To watch it:"
+  echo
+  echo "  screen -r in1click"
+  echo
+  exit 0
+fi
 
 # Exit on error, undefined variables, or pipeline failures
 set -euo pipefail
@@ -376,6 +388,7 @@ else
   echo -e "No 'trixie' references found after update. ${WHT}OK to proceed.${NC}"
 fi
 sleep $SLEEP_DELAY
+
 print_step "Upgrading packages... Please be patient."
 UPGRADE_OUTPUT=$(DEBIAN_FRONTEND=noninteractive apt -y \
   -o Dpkg::Options::="--force-confdef" \
@@ -468,7 +481,7 @@ fi
 print_step "Checking for curl..."
 if ! command -v curl >/dev/null 2>&1; then
   echo -e "${BRED}WARNING: curl not found. ${BYEL}Installing now...${NC}"
-apt install -y curl
+  apt install -y curl
   echo
   echo -e "curl installed successfully. ${WHT}OK to proceed.${NC}"
   echo
@@ -552,7 +565,7 @@ while [ "$MIRROR_ATTEMPTS" -lt "$MIRROR_MAX" ]; do
 done
 
 if [ "$MIRROR_GOOD_COUNT" -eq "$MIRROR_MAX" ]; then
-echo
+  echo
   echo -e "${BGRN}All $MIRROR_MAX checks passed. Great job, Sangoma! ${WHT}OK to proceed.${NC}"
   MIRROR_OK=true
 else
@@ -779,7 +792,7 @@ else
 fi
 sleep $SLEEP_DELAY
 
-# FreePBX GUI access instructions
+# FreePBX GUI access check
 print_step "Checking access to the FreePBX GUI..."
 IP_ADDR=$(hostname -I | awk '{print $1}')
 if nc -zv "$IP_ADDR" 80 2>&1 | grep -Eq 'open|succeeded'; then
@@ -804,7 +817,6 @@ if [ "$IS_HEQET" = true ]; then
   echo
   if [ -f /etc/systemd/system/in1click-firstboot.service ]; then
     systemctl disable in1click-firstboot.service
-    # Do not delete immediately; schedule safe deletion on next boot
     cat <<EOF > /usr/local/bin/in1click-final-cleanup.sh
 #!/bin/bash
 rm -f /etc/systemd/system/in1click-firstboot.service
@@ -819,7 +831,6 @@ EOF
   fi
   if [ -f /etc/systemd/system/in1click-cleanup.service ]; then
     systemctl disable in1click-cleanup.service
-    # Do not delete immediately; schedule safe deletion on next boot
     cat <<EOF > /usr/local/bin/in1click-cleanup-final.sh
 #!/bin/bash
 rm -f /etc/systemd/system/in1click-cleanup.service
@@ -879,3 +890,10 @@ echo
 echo -e "${CYAN}Goodbye.${NC}"
 echo
 sleep 4
+
+# Clean up the screen session that was created at the start of this script
+# to protect the install from SSH disconnection. Now that the install is
+# complete, we no longer need it. This leaves no orphaned screen sessions.
+if [ -n "${STY:-}" ]; then
+  screen -S in1click -X quit
+fi
