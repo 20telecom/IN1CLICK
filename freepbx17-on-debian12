@@ -21,7 +21,7 @@ VERSION="1.2.2"
 # ${VERSION}
 #
 # PUBLISHED:
-# 6th March 2026 21:00 GMT
+# 6th March 2026 20:00 GMT
 #
 # LICENSE:
 # GNU General Public License v3.0
@@ -309,19 +309,24 @@ else
 fi
 sleep $SLEEP_DELAY
 
-# APT source check
-print_step "Checking APT sources and update availability..."
+print_step "Checking APT sources and fixing if necessary..."
 APT_SOURCES_OK=false
-if [ -f /etc/apt/sources.list ] && grep -qE 'deb(\.|-security\.)debian\.org' /etc/apt/sources.list; then
+if grep -qE 'deb(\.|-security\.)debian\.org' /etc/apt/sources.list 2>/dev/null; then
   APT_SOURCES_OK=true
 fi
 if grep -qrE 'debian\.org' /etc/apt/sources.list.d/ 2>/dev/null; then
   APT_SOURCES_OK=true
 fi
 if [ "$APT_SOURCES_OK" = false ]; then
-  echo -e "${BRED}Warning:${NC} APT sources do not appear to point to official Debian mirrors (e.g. deb.debian.org). Errors could occur due to outdated or unsupported packages. ${BYEL}Continuing anyway...${NC}"
+  echo -e "${BYEL}APT sources do not point to official Debian mirrors. Rewriting now...${NC}"
+  cat > /etc/apt/sources.list << 'EOF'
+deb http://deb.debian.org/debian bookworm main
+deb http://deb.debian.org/debian bookworm-updates main
+deb http://security.debian.org/debian-security bookworm-security main
+EOF
+  echo -e "APT sources rewritten to official Debian mirrors. ${WHT}OK to proceed.${NC}"
 else
-  echo -e "APT sources appear to be valid. ${WHT}OK to proceed.${NC}"
+  echo -e "APT sources already point to official Debian mirrors. ${WHT}OK to proceed.${NC}"
 fi
 sleep $SLEEP_DELAY
 
@@ -710,6 +715,56 @@ else
   echo -e "No APT locks detected. ${WHT}OK to proceed.${NC}"
 fi
 sleep $SLEEP_DELAY
+
+# All pre-flight checks have passed. From this point the install takes over
+# and a dropped SSH connection would leave the system in a broken state.
+# Launch inside a screen session now so the install survives disconnection.
+# The user remains attached and watching live. If SSH drops, reconnect and
+# run: screen -r in1click
+# The /etc/profile.d/ hook below will also prompt on reconnection.
+if [ -z "${STY:-}" ]; then
+  apt-get install -y screen -qq > /dev/null 2>&1
+
+  # Drop a login hook into /etc/profile.d/ so that if the user reconnects
+  # after an SSH disconnection, they are prompted to reattach, leave it
+  # running, or abort the install. The file timestamp is used to calculate
+  # how long the install has been running, to inform the abort warning.
+  # This file is removed by IN1CLICK on successful completion (see cleanup).
+  cat > /etc/profile.d/in1click-reattach.sh << 'PROFILE'
+#!/bin/bash
+if screen -ls in1click | grep -q in1click; then
+  echo
+  echo "IN1CLICK is still running in the background."
+  echo
+  echo "  1) Yes - watch the output"
+  echo "  2) No  - leave it running"
+  echo "  3) Kill it - abort install"
+  echo
+  read -r -p "  Choice [1]: " choice
+  case "${choice:-1}" in
+    1) screen -r in1click ;;
+    2) ;;
+    3)
+      ELAPSED=$(( $(date +%s) - $(stat -c %Y /etc/profile.d/in1click-reattach.sh) ))
+      echo
+      echo "  WARNING: IN1CLICK has been running for $((ELAPSED / 60)) min $((ELAPSED % 60)) sec."
+      echo "  Aborting now will leave your system in a broken state."
+      echo
+      read -r -p "  Are you sure? [y/N]: " confirm
+      if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        screen -S in1click -X stuff $'\003'
+        rm -f /etc/profile.d/in1click-reattach.sh
+        echo "  IN1CLICK aborted. Your system may be in a broken state."
+      fi
+      ;;
+  esac
+  echo
+fi
+PROFILE
+  chmod +x /etc/profile.d/in1click-reattach.sh
+
+  exec screen -S in1click bash "$0" "$@"
+fi
 
 # Sangoma Official FreePBX Installation
 print_step "Installing FreePBX 17..."
