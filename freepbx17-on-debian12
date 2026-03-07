@@ -21,7 +21,7 @@ VERSION="1.2.2"
 # ${VERSION}
 #
 # PUBLISHED:
-# 6th March 2026 20:00 GMT
+# 7th March 2026 09:00 GMT
 #
 # LICENSE:
 # GNU General Public License v3.0
@@ -324,7 +324,7 @@ deb http://deb.debian.org/debian bookworm main
 deb http://deb.debian.org/debian bookworm-updates main
 deb http://security.debian.org/debian-security bookworm-security main
 EOF
-  echo -e "APT sources rewritten to official Debian mirrors. ${WHT}OK to proceed.${NC}"
+  echo -e "APT sources rewritten to deb.debian.org and security.debian.org. ${WHT}OK to proceed.${NC}"
 else
   echo -e "APT sources already point to official Debian mirrors. ${WHT}OK to proceed.${NC}"
 fi
