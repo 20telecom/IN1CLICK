@@ -2,7 +2,7 @@
 
 # Version Update
 
-From 1.3.0 to 1.3.1 on 11th March 2026 by kierknoby
+From 1.3.0 to 1.3.1 on 12th March 2026 by kierknoby
 
 Cosmetic changes. 
 
