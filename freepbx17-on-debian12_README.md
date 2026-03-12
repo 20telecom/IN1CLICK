@@ -37,18 +37,26 @@ Added screen session support for interactive SSH installs, non-interactive (clou
 
 ## One-Click Installation on Debian 12
 
-Option 1: On a fresh Debian 12 installation, run this curl command as root:
+Option 1: on a fresh Debian 12 installation, run this curl command as root:
 
 ```bash
 curl freepbx.in1.click | sh
 ```
 
-Option 2: On a fresh Debian 12 installation, run this wget command as root:
+Option 2: on a fresh Debian 12 installation, run this wget command as root:
 
 ```bash
 wget https://raw.githubusercontent.com/20telecom/IN1CLICK/main/freepbx17-on-debian12 -O /tmp/IN1CLICK && chmod +x /tmp/IN1CLICK && /tmp/IN1CLICK
 ```
 
+Option 3: cloud-init User Data on first boot of a fresh Debian 12 instance:
+```bash
+#cloud-config
+runcmd:
+  - wget https://raw.githubusercontent.com/20telecom/IN1CLICK/main/freepbx17-on-debian12 -O /tmp/IN1CLICK
+  - chmod +x /tmp/IN1CLICK
+  - /tmp/IN1CLICK
+```
 ---
 
 ## Features
