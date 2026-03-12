@@ -2,6 +2,10 @@
 
 # Version Update
 
+From 1.3.0 to 1.3.1 on 11th March 2026 by kierknoby
+
+Cosmetic changes. 
+
 From 1.2.1 to 1.3.0 on 11th March 2026 by kierknoby
 
 Added screen session support for interactive SSH installs, non-interactive (cloud-init/pipe) detection, reboot-required handling after package upgrades, an improved memory check with interactive abort option, APT source auto-rewrite for non-official mirrors, provider mirror list removal, a Ctrl+C trap during FreePBX installation, a stray file scan on self-removal (common paths first, then full filesystem), and a full Apache configuration and GUI verification step with ionCube detection and retry logic. Removed the post-install mirror re-check. See changelog below.
@@ -137,7 +141,7 @@ runcmd:
 ```
 Hello. Thanks for trying IN1CLICK for FreePBX 17 on Debian 12 (bookworm).
 
-In case you need support from 20tele.com, this is IN1CLICK version 1.3.0.
+In case you need support from 20tele.com, this is IN1CLICK version 1.3.1.
 
 Disabling unattended-upgrades for this session...
 Unattended upgrades stopped. OK to proceed.
@@ -246,7 +250,7 @@ Checking for FreePBX GitHub installer at raw.githubusercontent.com...
 FreePBX GitHub installer is reachable. OK to proceed.
 
 Checking outbound internet connectivity (public IP)...
-Outbound internet connectivity confirmed. Your Public IP is 203.0.113.45. OK to proceed.
+Outbound internet connectivity confirmed. Your Public IP is 123.45.67.89. OK to proceed.
 
 Checking for APT locks before installing FreePBX 17...
 No APT locks detected. OK to proceed.
@@ -270,7 +274,7 @@ Apache is running. OK to proceed.
 
 Configuring Apache and verifying FreePBX GUI...
 Root redirect to /admin/ added. OK to proceed.
-FreePBX setup page confirmed at http://203.0.113.45. OK to proceed.
+FreePBX setup page confirmed at http://123.45.67.89. OK to proceed.
 
 Cleaning Asterisk logs...
 Full, fail2ban, and root mail cleared. OK to proceed.
@@ -294,7 +298,7 @@ Attempting to delete IN1CLICK by 20tele.com: /tmp/IN1CLICK
 The temporary IN1CLICK script was removed successfully.
 Checking... IN1CLICK removal confirmed. OK to proceed.
 
-Thanks for trying IN1CLICK 1.3.0. FreePBX 17 is now ready to use.
+Thanks for trying IN1CLICK 1.3.1. FreePBX 17 is now ready to use.
 
 Please go to http://123.45.67.89 in your preferred web browser.
 
@@ -306,6 +310,11 @@ Goodbye.
 ---
 
 ## Changelog
+
+### 1.3.1 (11th March 2026)
+
+**Cosmetic changes**
+- Minor echo changes.
 
 ### 1.3.0 (11th March 2026)
 
