@@ -991,7 +991,6 @@ sleep $SLEEP_DELAY
 # Remove Heqet ISO components (if present)
 if [ "$IS_HEQET" = true ]; then
   print_step "IN1CLICK first-boot detected. Cleaning up..."
-  echo
   touch /opt/in1click/.installed
   echo -e "  - Install marked as complete"
   echo
@@ -1027,7 +1026,6 @@ EOF
   echo -e "  - Preseed files cleaned up"
   echo
   echo -e "Cleanup complete. ${WHT}OK to proceed.${NC}"
-  echo
   sleep $SLEEP_DELAY
 fi
 
