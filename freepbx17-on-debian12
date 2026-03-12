@@ -1,5 +1,5 @@
 #!/bin/bash
-VERSION="1.2.1"
+VERSION="1.3.0"
 
 #0################# IN1CLICK for FreePBX on Debian 12 ###################
 #
@@ -21,7 +21,7 @@ VERSION="1.2.1"
 # ${VERSION}
 #
 # PUBLISHED:
-# 3rd March 2026 13:00 GMT
+# 11th March 2026 07:30 GMT
 #
 # LICENSE:
 # GNU General Public License v3.0
@@ -30,6 +30,19 @@ VERSION="1.2.1"
 
 # Exit on error, undefined variables, or pipeline failures
 set -euo pipefail
+
+# If re-launched inside screen, skip pre-flight checks that already passed
+SKIP_CHECKS=false
+if [[ "${1:-}" == "--skip-checks" ]]; then
+  SKIP_CHECKS=true
+fi
+
+# Detect non-interactive execution (cloud-init, pipe, no TTY).
+# In these environments screen re-launch is not possible and must be skipped.
+IS_NONINTERACTIVE=false
+if [ ! -t 0 ]; then
+  IS_NONINTERACTIVE=true
+fi
 
 # Record the start time to calculate total runtime later
 START_TIME=$(date +%s)
@@ -57,16 +70,13 @@ countdown() {
   printf "\r                        \r"
 }
 
-# Welcome
-echo -e "${CYAN}Hello. Thanks for trying IN1CLICK for FreePBX 17 on Debian 12 (bookworm).${NC}"
-sleep $SLEEP_DELAY
-echo
-echo -e "${BYEL}In case you need support from 20tele.com, this is IN1CLICK version ${VERSION}.${NC}"
-
 # Function to print section headers
 print_step() {
   echo -e "\n${BGRN}$1${NC}\n"
 }
+
+# IS_HEQET must be set before either block runs so the install block can reference it
+IS_HEQET=false
 
 # If FreePBX Installation Fails
 handle_install_failure() {
@@ -91,6 +101,14 @@ handle_install_failure() {
   echo -e "${BRED}IN1CLICK is now exiting due to a failed FreePBX install. ${CYAN}Goodbye.${NC}"
   exit 1
 }
+
+if [ "$SKIP_CHECKS" = false ]; then
+
+# Welcome
+echo -e "${CYAN}Hello. Thanks for trying IN1CLICK for FreePBX 17 on Debian 12 (bookworm).${NC}"
+sleep 4
+echo
+echo -e "${BYEL}In case you need support from 20tele.com, this is IN1CLICK version ${VERSION}.${NC}"
 sleep 4
 
 # Disable unattended-upgrades to prevent APT lock conflicts during install
@@ -104,7 +122,6 @@ echo -e "Unattended upgrades disabled for this session. ${WHT}OK to proceed.${NC
 sleep $SLEEP_DELAY
 
 # Heqet ISO detection (used to skip interactive prompts during unattended install)
-IS_HEQET=false
 print_step "Checking if this is the Heqet ISO..."
 if [ -f /etc/systemd/system/in1click-firstboot.service ] || [ -f /etc/systemd/system/in1click-cleanup.service ]; then
   IS_HEQET=true
@@ -137,16 +154,44 @@ else
 fi
 sleep $SLEEP_DELAY
 
-# ─── Memory and Swap Check ───
+# Memory and Swap Check
 print_step "Checking available memory and swap..."
 TOTAL_MEM_KB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
 TOTAL_SWAP_KB=$(grep SwapTotal /proc/meminfo | awk '{print $2}')
 TOTAL_MEM_MB=$(( TOTAL_MEM_KB / 1024 ))
 TOTAL_SWAP_MB=$(( TOTAL_SWAP_KB / 1024 ))
-if (( TOTAL_MEM_MB < 1000 )) && (( TOTAL_SWAP_MB < 100 )); then
-  echo -e "${BRED}WARNING: Less than 1 GB RAM and no swap configured.${NC}"
-  echo -e "This may cause MariaDB, Apache, or Asterisk to crash during install or runtime."
-  echo -e "Consider adding swap with: ${WHT}fallocate -l 1G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile${NC}"
+if (( TOTAL_MEM_MB < 900 )) && (( TOTAL_SWAP_MB < 100 )); then
+  echo -e "${BRED}Insufficient memory. FreePBX 17 requires at least 1 GB RAM.${NC}"
+  echo -e "${WHT}This system has ${TOTAL_MEM_MB} MB RAM and no swap configured.${NC}"
+  echo -e "${WHT}The installer will likely be killed by the kernel before it completes.${NC}"
+  echo
+  if [ "$IS_HEQET" = true ] || [ "$IS_NONINTERACTIVE" = true ]; then
+    echo -e "${BYEL}Non-interactive install detected. Continuing despite low memory.${NC}"
+    echo -e "${WHT}If the install fails, add swap and retry:${NC}"
+    echo -e "${BGRN}  fallocate -l 1G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile${NC}"
+  else
+    echo -e "${BYEL} 1) Continue anyway${NC}"
+    echo -e "${BYEL} 2) Abort installation${NC}"
+    echo
+    read -r -p "$(echo -e "${BYEL}Choice [2]: ${NC}")" mem_choice
+    case "${mem_choice:-2}" in
+      1)
+        echo -e "${BYEL}Continuing despite low memory. Good luck.${NC}"
+        echo -e "${WHT}You can add swap now in another session with:${NC}"
+        echo -e "${BGRN}  fallocate -l 1G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile${NC}"
+        ;;
+      *)
+        echo
+        echo -e "${CYAN}Goodbye.${NC}"
+        echo
+        exit 1
+        ;;
+    esac
+  fi
+elif (( TOTAL_MEM_MB < 1000 )) && (( TOTAL_SWAP_MB < 100 )); then
+  echo -e "${BYEL}WARNING: Less than 1 GB RAM detected (${TOTAL_MEM_MB} MB). This may be a nominal 1 GB system. Continuing anyway...${NC}"
+  echo -e "${WHT}If the install fails with an OOM error, add swap and retry:${NC}"
+  echo -e "${BGRN}  fallocate -l 1G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile${NC}"
 else
   echo -e "Memory: ${TOTAL_MEM_MB} MB, Swap: ${TOTAL_SWAP_MB} MB. ${WHT}OK to proceed.${NC}"
 fi
@@ -168,9 +213,9 @@ print_step "Checking hostname label format..."
 HOST=$(hostname)
 HOSTNAME_LABEL="${HOST%%.*}"
 if [[ ! "$HOST" =~ ^[a-z0-9.-]+$ ]]; then
-echo -e "${BRED}Invalid hostname format. Use lowercase letters, numbers, and dashes only. Exiting.${NC}"
+  echo -e "${BRED}Invalid hostname format. Use lowercase letters, numbers, and dashes only. Exiting.${NC}"
   exit 1
- fi
+fi
 if [[ "$HOSTNAME_LABEL" =~ ^[0-9]+$ ]]; then
   echo -e "${BYEL}Hostname label is entirely numeric. Setting to freepbx.sangoma.local...${NC}"
   echo
@@ -189,9 +234,9 @@ if [[ "$HOSTNAME_LABEL" =~ ^[0-9]+$ ]]; then
     echo -e "${BRED}Invalid hostname label: must not be entirely numeric. Exiting.${NC}"
     exit 1
   fi
- fi
- echo -e "Hostname label appears valid. ${WHT}OK to proceed.${NC}"
- sleep $SLEEP_DELAY
+fi
+echo -e "Hostname label appears valid. ${WHT}OK to proceed.${NC}"
+sleep $SLEEP_DELAY
 
 # Desktop detection
 print_step "Checking for desktop environment..."
@@ -288,25 +333,47 @@ print_step "Checking for existing Node.js installation..."
 if command -v node >/dev/null 2>&1; then
   NODE_VERSION=$(node -v)
   echo -e "${BRED}WARNING: Node.js is already installed (${NODE_VERSION}). ${BYEL}Continuing anyway...${NC}"
-  IP_TYPE="Node.js already present"
 else
   echo -e "No existing Node.js installation found. ${WHT}OK to proceed.${NC}"
 fi
 sleep $SLEEP_DELAY
 
-# APT source check
-print_step "Checking APT sources and update availability..."
+# APT source check and fix
+print_step "Checking APT sources and fixing if necessary..."
 APT_SOURCES_OK=false
-if [ -f /etc/apt/sources.list ] && grep -qE 'deb(\.|-security\.)debian\.org' /etc/apt/sources.list; then
+if grep -qE 'deb(\.|-security\.)debian\.org' /etc/apt/sources.list 2>/dev/null; then
   APT_SOURCES_OK=true
 fi
 if grep -qrE 'debian\.org' /etc/apt/sources.list.d/ 2>/dev/null; then
   APT_SOURCES_OK=true
 fi
 if [ "$APT_SOURCES_OK" = false ]; then
-  echo -e "${BRED}Warning:${NC} APT sources do not appear to point to official Debian mirrors (e.g. deb.debian.org). Errors could occur due to outdated or unsupported packages. ${BYEL}Continuing anyway...${NC}"
+  echo -e "${BYEL}APT sources do not point to official Debian mirrors. Rewriting now...${NC}"
+  cat > /etc/apt/sources.list << 'EOF'
+deb http://deb.debian.org/debian bookworm main
+deb http://deb.debian.org/debian bookworm-updates main
+deb http://security.debian.org/debian-security bookworm-security main
+EOF
+  echo -e "APT sources rewritten to deb.debian.org and security.debian.org. ${WHT}OK to proceed.${NC}"
 else
-  echo -e "APT sources appear to be valid. ${WHT}OK to proceed.${NC}"
+  echo -e "APT sources already point to official Debian mirrors. ${WHT}OK to proceed.${NC}"
+fi
+
+# Remove DigitalOcean and other provider mirror list files that override APT sources
+# and cause apt-get update to fail when the provider mirror is unreachable.
+if [ -d /etc/apt/mirrors ]; then
+  rm -f /etc/apt/mirrors/*.list 2>/dev/null || true
+  echo -e "Provider mirror list files removed. ${WHT}OK to proceed.${NC}"
+fi
+# Remove debian.sources if it references a mirrorlist (provider-managed)
+if grep -q 'mirror+file\|mirrorlist\|mirrors\.' /etc/apt/sources.list.d/debian.sources 2>/dev/null; then
+  rm -f /etc/apt/sources.list.d/debian.sources
+  echo -e "Provider debian.sources removed. ${WHT}OK to proceed.${NC}"
+fi
+# Also remove any other sources.list.d entries pointing to provider mirrors
+if grep -rlE 'digitalocean|mirrors\.' /etc/apt/sources.list.d/ 2>/dev/null | grep -q .; then
+  grep -rlE 'digitalocean|mirrors\.' /etc/apt/sources.list.d/ | xargs rm -f
+  echo -e "Provider sources.list.d entries removed. ${WHT}OK to proceed.${NC}"
 fi
 sleep $SLEEP_DELAY
 
@@ -351,6 +418,7 @@ if [ "$LOCK_WAIT" -gt 0 ]; then
   echo -e "Lock released after ${LOCK_WAIT} seconds. ${WHT}OK to proceed.${NC}"
 else
   echo -e "No APT locks detected. ${WHT}OK to proceed.${NC}"
+  echo
 fi
 sleep $SLEEP_DELAY
 
@@ -377,8 +445,9 @@ else
   echo -e "No 'trixie' references found after update. ${WHT}OK to proceed.${NC}"
 fi
 sleep $SLEEP_DELAY
+
 print_step "Upgrading packages... Please be patient."
-UPGRADE_OUTPUT=$(DEBIAN_FRONTEND=noninteractive apt -y \
+UPGRADE_OUTPUT=$(DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt -y \
   -o Dpkg::Options::="--force-confdef" \
   -o Dpkg::Options::="--force-confold" upgrade 2>/dev/null)
 if echo "$UPGRADE_OUTPUT" | grep -q '0 upgraded'; then
@@ -387,6 +456,23 @@ else
   echo -e "Packages upgraded successfully. ${WHT}OK to proceed.${NC}"
 fi
 sleep $SLEEP_DELAY
+
+# Check if a reboot is required after the upgrade.
+# Skipped on Heqet (always boots fresh) and non-interactive installs (cloud-init
+# cannot reboot and re-trigger the user-data script automatically).
+if [ "$IS_HEQET" = false ] && [ "$IS_NONINTERACTIVE" = false ] && [ -f /var/run/reboot-required ]; then
+  echo
+  echo -e "${BRED}A reboot is required before FreePBX can be installed.${NC}"
+  echo -e "${WHT}This is usually caused by a kernel or system library update.${NC}"
+  echo
+  echo -e "${BYEL}IN1CLICK will reboot this server now.${NC}"
+  echo -e "${WHT}Once it has restarted, run the installer again with:${NC}"
+  echo -e "${BGRN}  curl https://freepbx.in1.click | sh${NC}"
+  echo
+  read -r -p "$(echo -e "${BYEL}Press Enter to reboot now, or Ctrl+C to cancel: ${NC}")"
+  reboot
+  exit 0
+fi
 
 # Operating System check 2
 print_step "Checking this is still Debian 12..."
@@ -411,13 +497,10 @@ fi
 IP_INFO=$(ip -o -4 addr show "$IFACE")
 if echo "$IP_INFO" | grep -q 'dynamic'; then
   echo -e "${BRED}WARNING: IP appears to be dynamically assigned (DHCP).${BYEL} Continuing anyway...${NC}"
-  IP_TYPE="DHCP"
 elif echo "$IP_INFO" | grep -q 'inet'; then
   echo -e "Static IP detected. ${WHT}OK to proceed.${NC}"
-  IP_TYPE="Static (assumed)"
 else
   echo -e "${BRED}WARNING: Unable to determine IP assignment type. ${BYEL}Continuing anyway...${NC}"
-  IP_TYPE="Unknown"
 fi
 sleep $SLEEP_DELAY
 
@@ -472,7 +555,7 @@ fi
 print_step "Checking for curl..."
 if ! command -v curl >/dev/null 2>&1; then
   echo -e "${BRED}WARNING: curl not found. ${BYEL}Installing now...${NC}"
-apt install -y curl
+  apt install -y curl
   echo
   echo -e "curl installed successfully. ${WHT}OK to proceed.${NC}"
   echo
@@ -480,8 +563,13 @@ else
   echo -e "curl is installed. ${WHT}OK to proceed.${NC}"
 fi
 
+MIRROR_ATTEMPTS=0
+MIRROR_OK=false
+MIRROR_GOOD_COUNT=0
 mirror_status=""
 deb_status=""
+MIRROR_MAX=3
+
 mirror_check_once() {
   local output_file
   output_file="$(mktemp)"
@@ -523,14 +611,9 @@ mirror_check_once() {
   rm -f "$output_file"
 }
 
-MIRROR_ATTEMPTS=0
-MIRROR_MAX=3
-MIRROR_OK=false
-MIRROR_GOOD_COUNT=0
-
 while [ "$MIRROR_ATTEMPTS" -lt "$MIRROR_MAX" ]; do
   MIRROR_ATTEMPTS=$((MIRROR_ATTEMPTS + 1))
-  echo -e "\n${BGRN}Using mirrors.in1.click to check the official FreePBX mirrors... [attempt $MIRROR_ATTEMPTS]${NC}\n"
+  echo -e "\n${BGRN}Using mirrors.in1.click to check the official FreePBX mirrors... (attempt $MIRROR_ATTEMPTS/$MIRROR_MAX)${NC}\n"
   mirror_check_once
 
   if [ "$mirror_status" = "good" ] && [ "$deb_status" = "good" ]; then
@@ -539,7 +622,7 @@ while [ "$MIRROR_ATTEMPTS" -lt "$MIRROR_MAX" ]; do
   elif [ "$mirror_status" = "good" ] && [ "$deb_status" != "good" ]; then
     echo -e "${BYEL}Module mirrors are stable but deb.freepbx.org (APT repo) is not healthy.${NC}"
   elif [ "$mirror_status" = "unreachable" ]; then
-    echo -e "${BRED}Could not reach the mirror checker at in1.click.${NC}"
+    echo -e "${BRED}Cannot reach the mirror checker. Your IP could be being blocked by Cloudflare.${NC}"
   elif [ "$mirror_status" = "bad" ]; then
     echo -e "${BRED}Mirrors are down or severely degraded.${NC}"
   elif [ "$mirror_status" = "warn" ]; then
@@ -556,7 +639,7 @@ while [ "$MIRROR_ATTEMPTS" -lt "$MIRROR_MAX" ]; do
 done
 
 if [ "$MIRROR_GOOD_COUNT" -eq "$MIRROR_MAX" ]; then
-echo
+  echo
   echo -e "${BGRN}All $MIRROR_MAX checks passed. Great job, Sangoma! ${WHT}OK to proceed.${NC}"
   MIRROR_OK=true
 else
@@ -565,7 +648,7 @@ fi
 
 if [ "$MIRROR_OK" = false ]; then
   while [ "$MIRROR_OK" = false ]; do
-    if [ "$IS_HEQET" = true ]; then
+    if [ "$IS_HEQET" = true ] || [ "$IS_NONINTERACTIVE" = true ]; then
       echo
       echo -e "${BRED}FreePBX mirrors are not available after $MIRROR_MAX attempts.${NC}"
       echo
@@ -588,7 +671,7 @@ if [ "$MIRROR_OK" = false ]; then
       echo -e "${WHT}     Or from a terminal:${NC}"
       echo -e "${BGRN}       curl mirrors.in1.click | sh${NC}"
       echo
-      echo -e "${WHT}  2. Once the mirrors are stable, boot from the ISO and start again.${NC}"
+      echo -e "${WHT}  2. Once the mirrors are stable, run the installer again.${NC}"
       echo
       echo -e "${WHT}  3. If the problem persists, email ${BYEL}support@20tele.com${NC}"
       echo
@@ -614,11 +697,23 @@ if [ "$MIRROR_OK" = false ]; then
         MIRROR_GOOD_COUNT=0
         while [ "$MIRROR_ATTEMPTS" -lt "$MIRROR_MAX" ]; do
           MIRROR_ATTEMPTS=$((MIRROR_ATTEMPTS + 1))
-          echo -e "\n${BGRN}Using mirrors.in1.click to check the official FreePBX mirrors... [attempt $MIRROR_ATTEMPTS]${NC}\n"
+          echo -e "\n${BGRN}Using mirrors.in1.click to check the official FreePBX mirrors... (attempt $MIRROR_ATTEMPTS/$MIRROR_MAX)${NC}\n"
           mirror_check_once
           if [ "$mirror_status" = "good" ] && [ "$deb_status" = "good" ]; then
             MIRROR_GOOD_COUNT=$((MIRROR_GOOD_COUNT + 1))
             echo -e "Check out https://in1.click/mirrors in a web browser. ${WHT}($MIRROR_GOOD_COUNT/$MIRROR_MAX passed)${NC}"
+          elif [ "$mirror_status" = "good" ] && [ "$deb_status" != "good" ]; then
+            echo -e "${BYEL}Module mirrors are stable but deb.freepbx.org (APT repo) is not healthy.${NC}"
+          elif [ "$mirror_status" = "unreachable" ]; then
+            echo -e "${BRED}Cannot reach the mirror checker. Your IP could be being blocked by Cloudflare.${NC}"
+          elif [ "$mirror_status" = "bad" ]; then
+            echo -e "${BRED}Mirrors are down or severely degraded.${NC}"
+          elif [ "$mirror_status" = "warn" ]; then
+            echo -e "${BYEL}Mirrors are responding but not fully healthy.${NC}"
+          elif [ "$mirror_status" = "server" ]; then
+            echo -e "${BYEL}The monitoring server itself is struggling.${NC}"
+          else
+            echo -e "${BRED}Mirror status could not be determined.${NC}"
           fi
           if [ "$MIRROR_ATTEMPTS" -lt "$MIRROR_MAX" ]; then
             countdown 30
@@ -698,6 +793,84 @@ else
 fi
 sleep $SLEEP_DELAY
 
+# All pre-flight checks have passed. For interactive SSH installs, launch inside
+# a screen session so the install survives disconnection. Non-interactive runs
+# (cloud-init, pipe, no TTY) skip screen entirely and proceed directly.
+if [ -z "${STY:-}" ] && [ "$IS_NONINTERACTIVE" = false ]; then
+  apt-get install -y screen -qq > /dev/null 2>&1
+
+  # Drop a login hook into /etc/profile.d/ so that if the user reconnects
+  # after an SSH disconnection, they are prompted to reattach, leave it
+  # running, or abort the install. The file timestamp is used to calculate
+  # how long the install has been running, to inform the abort warning.
+  # This file is removed by IN1CLICK on successful completion (see cleanup).
+  cat > /etc/profile.d/in1click-reattach.sh << 'PROFILE'
+#!/bin/bash
+if screen -ls in1click | grep -q in1click; then
+  echo
+  echo "IN1CLICK is still running in the background."
+  echo
+  echo "  1) Yes - watch the output"
+  echo "  2) No  - leave it running"
+  echo "  3) Kill it - abort install"
+  echo
+  read -r -p "  Choice [1]: " choice
+  case "${choice:-1}" in
+    1) screen -D -r in1click ;;
+    2) ;;
+    3)
+      ELAPSED=$(( $(date +%s) - $(stat -c %Y /etc/profile.d/in1click-reattach.sh) ))
+      echo
+      echo "  WARNING: IN1CLICK has been running for $((ELAPSED / 60)) min $((ELAPSED % 60)) sec."
+      echo "  Aborting now will leave your system in a broken state."
+      echo
+      read -r -p "  Are you sure? [y/N]: " confirm
+      if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        screen -S in1click -X stuff $'\003'
+        rm -f /etc/profile.d/in1click-reattach.sh
+        echo "  IN1CLICK aborted. Your system may be in a broken state."
+      fi
+      ;;
+  esac
+  echo
+fi
+PROFILE
+  chmod +x /etc/profile.d/in1click-reattach.sh
+
+  screen -S in1click bash "$0" --skip-checks "$@"
+
+  # Screen has closed. Show farewell in the outer shell.
+  END_TIME=$(date +%s)
+  ELAPSED=$((END_TIME - START_TIME))
+  echo -e "${BGRN}Thanks for trying IN1CLICK ${VERSION}. FreePBX 17 is now ready to use.${NC}"
+  echo
+  echo -e "Please go to ${BGRN}http://$(hostname -I | awk '{print $1}')${NC} in your preferred web browser."
+  echo
+  echo -e "${WHT}IN1CLICK completed in $((ELAPSED / 60)) min $((ELAPSED % 60)) sec.${NC}"
+  echo
+  echo -e "${CYAN}Goodbye.${NC}"
+  echo
+  exit 0
+fi
+
+# Non-interactive path: skip screen, go straight to install block.
+# Also reached when re-launched inside screen with --skip-checks.
+SKIP_CHECKS=true
+
+fi # end SKIP_CHECKS=false (pre-flight block)
+
+if [ "$SKIP_CHECKS" = true ]; then
+
+echo -e "${BGRN}Pre-flight checks complete. Preparing for takeoff, fasten your seatbelts.${NC}"
+sleep 4
+echo
+echo -e "${BYEL}In case you need support from 20tele.com, this is IN1CLICK version ${VERSION}.${NC}"
+sleep 4
+
+# Trap Ctrl+C during install to show a clear failure message rather than
+# dying silently and leaving the user logged out with a broken system.
+trap 'handle_install_failure' INT
+
 # Sangoma Official FreePBX Installation
 print_step "Installing FreePBX 17..."
 sleep $SLEEP_DELAY
@@ -705,46 +878,22 @@ cd /usr/src
 wget -q https://raw.githubusercontent.com/FreePBX/sng_freepbx_debian_install/master/sng_freepbx_debian_install.sh -O freepbx17-install.sh
 chmod +x freepbx17-install.sh
 ./freepbx17-install.sh || handle_install_failure
+trap - INT
 sleep $SLEEP_DELAY
 
-# Modules upgrade (re-check mirrors first - they may have degraded during install)
-UPGRADE_MIRROR_OK=false
-for UPGRADE_ATTEMPT in 1 2 3; do
-  echo -e "\n${BGRN}Using mirrors.in1.click to check the official FreePBX mirrors... [attempt $UPGRADE_ATTEMPT/3]${NC}\n"
-  mirror_check_once
-  if [ "$mirror_status" = "good" ]; then
-    UPGRADE_MIRROR_OK=true
-    break
-  fi
-  if [ "$mirror_status" = "unreachable" ]; then
-    echo -e "${BYEL}Could not reach the mirror checker.${NC}"
-  elif [ "$mirror_status" = "bad" ]; then
-    echo -e "${BYEL}Mirrors are down or severely degraded.${NC}"
-  else
-    echo -e "${BYEL}Mirrors are not fully stable.${NC}"
-  fi
-  if [ "$UPGRADE_ATTEMPT" -lt 3 ]; then
-    countdown 30
-  fi
-done
+# Upgrade all modules
+print_step "Upgrading FreePBX modules..."
+fwconsole ma upgradeall || echo -e "${BYEL}Module upgrade completed with some warnings. Continuing anyway...${NC}"
 
-if [ "$UPGRADE_MIRROR_OK" = true ]; then
-  echo -e "Check out https://in1.click/mirrors in a web browser. ${WHT}Upgrading modules...${NC}"
-  echo
-  fwconsole ma upgradeall || echo -e "${BYEL}Module upgrade completed with some warnings. Continuing anyway...${NC}"
-else
-  echo -e "${BYEL}Mirrors are not stable. Skipping module upgrade to avoid partial updates.${NC}"
-  echo -e "${WHT}FreePBX is installed and working. You can upgrade modules later with:${NC}"
-  echo -e "${BGRN}  fwconsole ma upgradeall${NC}"
-fi
+print_step "Setting correct file ownership..."
 fwconsole chown
+echo -e "File ownership set. ${WHT}OK to proceed.${NC}"
+sleep $SLEEP_DELAY
 
 # Reload FreePBX
-echo
-echo -e "Attempting FreePBX reload..."
+print_step "Reloading FreePBX..."
 if ! fwconsole reload; then
   echo -e "${BRED}Initial reload failed. Retrying in 15 seconds...${NC}"
-  sleep $SLEEP_DELAY
   sleep 15
   if ! fwconsole reload; then
     echo -e "${BRED}Second reload also failed. Continuing anyway...${NC}"
@@ -764,13 +913,72 @@ else
 fi
 sleep $SLEEP_DELAY
 
-# FreePBX GUI access instructions
-print_step "Checking access to the FreePBX GUI..."
+# Configure Apache and verify FreePBX GUI is responding correctly.
+# Enables required modules, activates the FreePBX site config, adds a root
+# redirect to /admin/, and restarts Apache. Then confirms the FreePBX setup
+# page is loading rather than the Apache default. If not, attempts to fix
+# and retry up to 3 times before warning and moving on.
+print_step "Configuring Apache and verifying FreePBX GUI..."
+
 IP_ADDR=$(hostname -I | awk '{print $1}')
-if nc -zv "$IP_ADDR" 80 2>&1 | grep -Eq 'open|succeeded'; then
-  echo -e "Port 80 is open on $IP_ADDR. ${WHT}OK to proceed.${NC}"
-else
-  echo -e "${BRED}Port 80 is not open on $IP_ADDR. The FreePBX GUI may not be accessible.${NC}"
+
+apache_configure() {
+  a2enmod rewrite expires headers 2>/dev/null || true
+  a2ensite freepbx.conf 2>/dev/null || true
+  if ! grep -q 'RedirectMatch' /etc/apache2/sites-enabled/000-default.conf 2>/dev/null; then
+    sed -i 's|DocumentRoot /var/www/html|DocumentRoot /var/www/html\n\tRedirectMatch ^/$ /admin/|' /etc/apache2/sites-enabled/000-default.conf
+    echo -e "Root redirect to /admin/ added. ${WHT}OK to proceed.${NC}"
+  else
+    echo -e "Root redirect already present. ${WHT}OK to proceed.${NC}"
+  fi
+  systemctl restart apache2
+}
+
+apache_configure
+
+# Check port 80 is open before attempting GUI check
+if ! nc -zv "$IP_ADDR" 80 2>&1 | grep -Eq 'open|succeeded'; then
+  echo -e "${BRED}Port 80 is not open on $IP_ADDR. Re-applying Apache config...${NC}"
+  apache_configure
+fi
+
+GUI_OK=false
+RETRY=0
+while [ $RETRY -lt 3 ]; do
+  RETRY=$((RETRY + 1))
+  HTTP_BODY=$(curl -s --max-time 10 "http://$IP_ADDR/admin/config.php")
+  if echo "$HTTP_BODY" | grep -q 'Welcome to FreePBX'; then
+    echo -e "FreePBX setup page confirmed at http://$IP_ADDR. ${WHT}OK to proceed.${NC}"
+    GUI_OK=true
+    break
+  elif echo "$HTTP_BODY" | grep -q 'ionCube'; then
+    echo -e "${BRED}ionCube Loader error detected. FreePBX did not install correctly.${NC}"
+    echo -e "${WHT}This is a failed FreePBX installation, not an Apache problem.${NC}"
+    handle_install_failure
+  elif echo "$HTTP_BODY" | grep -q 'Apache2 Debian Default Page'; then
+    echo -e "${BRED}Apache default page detected instead of FreePBX. [$RETRY/3] Re-applying config...${NC}"
+    apache_configure
+  else
+    echo -e "${BRED}Unexpected response from http://$IP_ADDR. [$RETRY/3] Retrying...${NC}"
+  fi
+  if [ $RETRY -lt 3 ]; then
+    countdown 10
+  fi
+done
+
+if [ "$GUI_OK" = false ]; then
+  echo -e "${BRED}FreePBX GUI did not respond correctly after 3 attempts.${NC}"
+  echo -e "${WHT}The install may be incomplete. Do not proceed until this is resolved.${NC}"
+  echo -e "${WHT}Check Apache with: ${BGRN}systemctl status apache2${NC}"
+  echo -e "${WHT}Check FreePBX with: ${BGRN}fwconsole sa${NC}"
+  echo
+  if [ "$IS_HEQET" = true ] || [ "$IS_NONINTERACTIVE" = true ]; then
+    echo -e "${BRED}Non-interactive install: GUI did not come up. Exiting.${NC}"
+    exit 1
+  fi
+  echo -e "${BYEL}IN1CLICK is paused. Press Enter to exit once you have investigated.${NC}"
+  read -r
+  exit 1
 fi
 sleep $SLEEP_DELAY
 
@@ -789,7 +997,6 @@ if [ "$IS_HEQET" = true ]; then
   echo
   if [ -f /etc/systemd/system/in1click-firstboot.service ]; then
     systemctl disable in1click-firstboot.service
-    # Do not delete immediately; schedule safe deletion on next boot
     cat <<EOF > /usr/local/bin/in1click-final-cleanup.sh
 #!/bin/bash
 rm -f /etc/systemd/system/in1click-firstboot.service
@@ -804,7 +1011,6 @@ EOF
   fi
   if [ -f /etc/systemd/system/in1click-cleanup.service ]; then
     systemctl disable in1click-cleanup.service
-    # Do not delete immediately; schedule safe deletion on next boot
     cat <<EOF > /usr/local/bin/in1click-cleanup-final.sh
 #!/bin/bash
 rm -f /etc/systemd/system/in1click-cleanup.service
@@ -825,42 +1031,83 @@ EOF
   sleep $SLEEP_DELAY
 fi
 
+# Remove the reconnection hook now that the install is complete.
+rm -f /etc/profile.d/in1click-reattach.sh
+
 # Clear interactive bash history from current session
 print_step "Clearing bash history..."
-unset HISTFILE && history -c
+unset HISTFILE; history -c 2>/dev/null || true
 echo -e "Bash history cleared. ${WHT}OK to proceed.${NC}"
-echo
 sleep $SLEEP_DELAY
 
-# IN1CLICK leave-no-trace cleanup (skip on Heqet, script is managed by the ISO)
+print_step "Removing all traces of IN1CLICK..."
+if [ "$IS_HEQET" = true ]; then
+  echo "Attempting to delete IN1CLICK by 20tele.com: $0"
+  echo "Handled by the Heqet ISO preseed. Nothing to do."
+fi
 if [ "$IS_HEQET" = false ]; then
   SCRIPT_PATH=$(realpath "$0")
   echo "Attempting to delete IN1CLICK by 20tele.com: $SCRIPT_PATH"
   echo
   if [[ -w "$SCRIPT_PATH" ]]; then
     if rm -- "$SCRIPT_PATH"; then
-      echo "IN1CLICK by 20tele.com removed successfully."
+      echo "The temporary IN1CLICK script was removed successfully."
     else
       echo "WARNING: Failed to delete the script file: $SCRIPT_PATH"
     fi
   else
     echo "WARNING: Script file is not writable. Skipping deletion."
   fi
+  echo
+  if find /tmp /usr/local/bin /root -name 'IN1CLICK' 2>/dev/null | grep -q .; then
+    echo -e "${BRED}WARNING: IN1CLICK still found on disk. Please remove manually.${NC}"
+  else
+    echo -e "Checking... IN1CLICK removal confirmed. ${WHT}OK to proceed.${NC}"
+  fi
+  echo
+  STRAY=$(find / -name 'IN1CLICK' 2>/dev/null)
+  if [[ -n "$STRAY" ]]; then
+    echo -e "${BRED}WARNING: IN1CLICK trace found at $STRAY. Please remove manually.${NC}"
+  fi
+  echo
+  sleep 4
 fi
 
-# Install duration
-END_TIME=$(date +%s)
-ELAPSED=$((END_TIME - START_TIME))
-echo -e "${WHT}IN1CLICK completed in $((ELAPSED / 60)) min $((ELAPSED % 60)) sec.${NC}"
-echo
-echo -e "${CYAN}Goodbye.${NC}"
-echo
-sleep 4
+# Completion message for non-interactive (cloud-init) non-Heqet installs.
+if [ "$IS_HEQET" = false ] && [ "$IS_NONINTERACTIVE" = true ]; then
+  END_TIME=$(date +%s)
+  ELAPSED=$((END_TIME - START_TIME))
+  echo -e "${BGRN}Thanks for trying IN1CLICK ${VERSION}. FreePBX 17 is now ready to use.${NC}"
+  echo
+  echo -e "Please go to ${BGRN}http://$(hostname -I | awk '{print $1}')${NC} in your preferred web browser."
+  echo
+  echo -e "${WHT}IN1CLICK completed in $((ELAPSED / 60)) min $((ELAPSED % 60)) sec.${NC}"
+  echo
+  echo -e "${CYAN}Goodbye.${NC}"
+  echo
+  sleep 4
+fi
 
-# Restore getty on tty1 for login prompt after install (Heqet only)
+# Restore getty on tty1 for login prompt after install (Heqet only).
 if [ "$IS_HEQET" = true ]; then
+  END_TIME=$(date +%s)
+  ELAPSED=$((END_TIME - START_TIME))
+  echo -e "${BGRN}Thanks for trying IN1CLICK ${VERSION}. FreePBX 17 is now ready to use.${NC}"
+  echo
+  echo -e "Please go to ${BGRN}http://${IP_ADDR}${NC} in your preferred web browser."
+  echo
+  echo -e "${WHT}IN1CLICK completed in $((ELAPSED / 60)) min $((ELAPSED % 60)) sec.${NC}"
+  echo
+  echo -e "${CYAN}Goodbye.${NC}"
+  echo
+  sleep 4
+  echo -e "    The login prompt is being restored..."
   print_step "Restoring login prompt on tty1..."
   systemctl unmask getty@tty1.service
   systemctl enable getty@tty1.service
   systemctl restart getty@tty1.service
 fi
+
+fi # end SKIP_CHECKS=true (install block)
+
+exit 0
