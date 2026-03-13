@@ -1,5 +1,5 @@
 #!/bin/bash
-VERSION="1.3.1"
+VERSION="1.3.2"
 
 #0################# IN1CLICK for FreePBX on Debian 12 ###################
 #
@@ -21,7 +21,7 @@ VERSION="1.3.1"
 # ${VERSION}
 #
 # PUBLISHED:
-# 12th March 2026 16:30 GMT
+# 13th March 2026 16:00 GMT
 #
 # LICENSE:
 # GNU General Public License v3.0
@@ -105,6 +105,7 @@ handle_install_failure() {
 if [ "$SKIP_CHECKS" = false ]; then
 
 # Welcome
+echo
 echo -e "${CYAN}Hello. Thanks for trying IN1CLICK for FreePBX 17 on Debian 12 (bookworm).${NC}"
 sleep 4
 echo
@@ -364,11 +365,13 @@ fi
 if [ -d /etc/apt/mirrors ]; then
   rm -f /etc/apt/mirrors/*.list 2>/dev/null || true
   echo -e "Provider mirror list files removed. ${WHT}OK to proceed.${NC}"
+  echo
 fi
 # Remove debian.sources if it references a mirrorlist (provider-managed)
 if grep -q 'mirror+file\|mirrorlist\|mirrors\.' /etc/apt/sources.list.d/debian.sources 2>/dev/null; then
   rm -f /etc/apt/sources.list.d/debian.sources
   echo -e "Provider debian.sources removed. ${WHT}OK to proceed.${NC}"
+  echo
 fi
 # Also remove any other sources.list.d entries pointing to provider mirrors
 if grep -rlE 'digitalocean|mirrors\.' /etc/apt/sources.list.d/ 2>/dev/null | grep -q .; then
@@ -418,7 +421,6 @@ if [ "$LOCK_WAIT" -gt 0 ]; then
   echo -e "Lock released after ${LOCK_WAIT} seconds. ${WHT}OK to proceed.${NC}"
 else
   echo -e "No APT locks detected. ${WHT}OK to proceed.${NC}"
-  echo
 fi
 sleep $SLEEP_DELAY
 
@@ -842,6 +844,7 @@ PROFILE
   # Screen has closed. Show farewell in the outer shell.
   END_TIME=$(date +%s)
   ELAPSED=$((END_TIME - START_TIME))
+  echo
   echo -e "${BGRN}Thanks for trying IN1CLICK ${VERSION}. FreePBX 17 is now ready to use.${NC}"
   echo
   echo -e "Please go to ${BGRN}http://$(hostname -I | awk '{print $1}')${NC} in your preferred web browser."
@@ -861,6 +864,7 @@ fi # end SKIP_CHECKS=false (pre-flight block)
 
 if [ "$SKIP_CHECKS" = true ]; then
 
+echo
 echo -e "${BGRN}Pre-flight checks complete. Preparing for takeoff, fasten your seatbelts.${NC}"
 sleep 4
 echo
@@ -887,6 +891,7 @@ fwconsole ma upgradeall || echo -e "${BYEL}Module upgrade completed with some wa
 
 print_step "Setting correct file ownership..."
 fwconsole chown
+echo
 echo -e "File ownership set. ${WHT}OK to proceed.${NC}"
 sleep $SLEEP_DELAY
 
@@ -1075,6 +1080,7 @@ fi
 if [ "$IS_HEQET" = false ] && [ "$IS_NONINTERACTIVE" = true ]; then
   END_TIME=$(date +%s)
   ELAPSED=$((END_TIME - START_TIME))
+  echo
   echo -e "${BGRN}Thanks for trying IN1CLICK ${VERSION}. FreePBX 17 is now ready to use.${NC}"
   echo
   echo -e "Please go to ${BGRN}http://$(hostname -I | awk '{print $1}')${NC} in your preferred web browser."
@@ -1090,6 +1096,7 @@ fi
 if [ "$IS_HEQET" = true ]; then
   END_TIME=$(date +%s)
   ELAPSED=$((END_TIME - START_TIME))
+  echo
   echo -e "${BGRN}Thanks for trying IN1CLICK ${VERSION}. FreePBX 17 is now ready to use.${NC}"
   echo
   echo -e "Please go to ${BGRN}http://${IP_ADDR}${NC} in your preferred web browser."
