@@ -21,7 +21,7 @@ VERSION="1.3.2"
 # ${VERSION}
 #
 # PUBLISHED:
-# 12th March 2026 16:30 GMT
+# 13th March 2026 15:00 GMT
 #
 # LICENSE:
 # GNU General Public License v3.0
@@ -891,6 +891,7 @@ fwconsole ma upgradeall || echo -e "${BYEL}Module upgrade completed with some wa
 
 print_step "Setting correct file ownership..."
 fwconsole chown
+echo
 echo -e "File ownership set. ${WHT}OK to proceed.${NC}"
 sleep $SLEEP_DELAY
 
